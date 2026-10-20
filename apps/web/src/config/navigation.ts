@@ -36,15 +36,27 @@ export const HOME_SECTION_IDS = {
 } as const;
 
 /**
- * Primary marketing navigation. Only implemented destinations appear here (homepage sections);
- * Security, Contact and legal pages join when those routes exist (docs/PRD.md "Core pages").
+ * Primary marketing navigation: one real page per destination (FE-08). Every href must have a page under
+ * src/app/(marketing) (enforced by navigation.test.ts).
  */
 export const marketingNav: NavItem[] = [
-  { label: "Platform", href: `/#${HOME_SECTION_IDS.platform}` },
-  { label: "Product", href: `/#${HOME_SECTION_IDS.product}` },
-  { label: "How it works", href: `/#${HOME_SECTION_IDS.workflow}` },
-  { label: "Developers", href: `/#${HOME_SECTION_IDS.developers}` },
-  { label: "Pricing", href: `/#${HOME_SECTION_IDS.pricing}` },
+  { label: "Platform", href: "/platform" },
+  { label: "Features", href: "/features" },
+  { label: "Solutions", href: "/solutions" },
+  { label: "Security", href: "/security" },
+  { label: "Developers", href: "/developers" },
+  { label: "Pricing", href: "/pricing" },
+];
+
+/** Secondary marketing destinations, reached from the footer. */
+export const companyNav: NavItem[] = [
+  { label: "About", href: "/about" },
+  { label: "Contact", href: "/contact" },
+];
+
+export const legalNav: NavItem[] = [
+  { label: "Privacy Policy", href: "/privacy" },
+  { label: "Terms of Service", href: "/terms" },
 ];
 
 /**

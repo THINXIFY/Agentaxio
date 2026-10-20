@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { ArrowUpRight, Menu } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { Container } from "@/components/layout/container";
@@ -84,7 +85,7 @@ export function MarketingHeader({
           <ul className="flex items-center gap-0.5 lg:gap-2">
             {items.map((item) => (
               <li key={item.href}>
-                <NavEntry item={item} active={active === sectionIdOf(item)} />
+                <NavEntry item={item} active={active !== null && active === sectionIdOf(item)} />
               </li>
             ))}
           </ul>
@@ -110,7 +111,7 @@ export function MarketingHeader({
                     <li key={item.href} className="border-b border-border">
                       <NavEntry
                         item={item}
-                        active={active === sectionIdOf(item)}
+                        active={active !== null && active === sectionIdOf(item)}
                         mobile
                         onNavigate={() => setMenuOpen(false)}
                       />
@@ -142,6 +143,9 @@ function NavEntry({
   mobile?: boolean;
   onNavigate?: () => void;
 }) {
+  const pathname = usePathname();
+  const isPage =
+    !item.href.includes("#") && (pathname === item.href || pathname.startsWith(`${item.href}/`));
   if (item.planned) {
     return (
       <span aria-disabled="true" className="cursor-default px-3 py-2 text-muted-foreground/70">
@@ -153,9 +157,9 @@ function NavEntry({
     <Link
       href={item.href}
       onClick={onNavigate}
-      aria-current={active ? "location" : undefined}
+      aria-current={isPage ? "page" : active ? "location" : undefined}
       className={cn(
-        "group relative block text-sm text-muted-foreground transition-colors duration-200 ease-standard hover:text-foreground aria-[current=location]:text-foreground",
+        "group relative block text-sm text-muted-foreground transition-colors duration-200 ease-standard hover:text-foreground aria-[current=location]:text-foreground aria-[current=page]:text-foreground",
         mobile ? "py-4 text-lg" : "rounded-control px-3 py-2",
       )}
     >
@@ -164,7 +168,7 @@ function NavEntry({
       <span
         aria-hidden="true"
         className={cn(
-          "absolute h-px origin-left scale-x-0 bg-primary transition-transform duration-300 ease-emphasized group-hover:scale-x-100 group-aria-[current=location]:scale-x-100",
+          "absolute h-px origin-left scale-x-0 bg-primary transition-transform duration-300 ease-emphasized group-hover:scale-x-100 group-aria-[current=location]:scale-x-100 group-aria-[current=page]:scale-x-100",
           mobile ? "bottom-0 left-0 w-full" : "inset-x-3 bottom-1",
         )}
       />

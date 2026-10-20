@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import HomePage from "@/app/(marketing)/page";
 import { CodeTabs, type CodeTab } from "@/components/marketing/code-tabs";
 import { ProductPreview } from "@/components/marketing/product-preview";
-import { HOME_SECTION_IDS, marketingNav } from "@/config/navigation";
+import { HOME_SECTION_IDS } from "@/config/navigation";
 import { axe } from "@/test/axe";
 
 const KNOWN_ROUTES = new Set(["/", "/dashboard", "/dashboard/agents", "/dashboard/settings"]);
@@ -35,13 +35,10 @@ describe("HomePage", () => {
     );
   });
 
-  it("defines every section anchor the navigation points at", () => {
+  it("defines every section anchor the homepage links to", () => {
     const { container } = render(<HomePage />);
     for (const id of Object.values(HOME_SECTION_IDS)) {
       expect(container.querySelector(`#${id}`), `missing #${id}`).not.toBeNull();
-    }
-    for (const item of marketingNav) {
-      expect(container.querySelector(`#${item.href.slice(2)}`)).not.toBeNull();
     }
   });
 

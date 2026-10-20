@@ -3,9 +3,11 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   appNav,
+  companyNav,
   HOME_SECTION_IDS,
   isActivePath,
   isNavItemActive,
+  legalNav,
   marketingNav,
   primaryNav,
   secondaryNav,
@@ -79,12 +81,35 @@ describe("dashboard navigation", () => {
 });
 
 describe("marketing navigation", () => {
-  it("contains only functional homepage anchors (no dead links)", () => {
-    const ids = new Set<string>(Object.values(HOME_SECTION_IDS));
-    for (const item of marketingNav) {
-      expect(item.planned).toBeFalsy();
-      expect(item.href).toMatch(/^\/#/);
-      expect(ids.has(item.href.slice(2))).toBe(true);
+  const marketingDir = join(__dirname, "..", "app", "(marketing)");
+  const all = [...marketingNav, ...companyNav, ...legalNav];
+
+  it("lists the six primary pages in order", () => {
+    expect(marketingNav.map((n) => n.label)).toEqual([
+      "Platform",
+      "Features",
+      "Solutions",
+      "Security",
+      "Developers",
+      "Pricing",
+    ]);
+  });
+
+  it("never links to a page that does not exist (no dead links)", () => {
+    for (const item of all) {
+      expect(item.planned, item.label).toBeFalsy();
+      expect(item.href, item.label).toMatch(/^\/[a-z-]+$/);
+      expect(existsSync(join(marketingDir, item.href.slice(1), "page.tsx")), item.href).toBe(true);
     }
+  });
+
+  it("has unique destinations", () => {
+    const hrefs = all.map((n) => n.href);
+    expect(new Set(hrefs).size).toBe(hrefs.length);
+  });
+
+  it("keeps the homepage section ids defined for in-page links", () => {
+    expect(Object.values(HOME_SECTION_IDS)).toContain("platform");
+    expect(Object.values(HOME_SECTION_IDS)).toContain("developers");
   });
 });
