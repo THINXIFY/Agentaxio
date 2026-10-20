@@ -1,6 +1,6 @@
-# AgentAxio — Frontend Foundation, Homepage and Dashboard (FE-00 … FE-05)
+# AgentAxio — Frontend Foundation, Homepage and Dashboard (FE-00 … FE-08)
 
-Status: FE-00 foundation; FE-02/FE-03 homepage (redesign, performance); FE-04 dashboard redesign, simplified in FE-05; Obsidian Black × Midnight Violet adopted and the dashboard surfaces refined (FE-06/FE-07). Awaiting visual review. Frontend only; **no backend, auth, billing or deployment exists.** Screenshots: `docs/screenshots/fe-07-dashboard-refined/` (dashboard, current), `fe-06-violet-preview/` (approved concepts), `fe-05/` and `fe-04/` (earlier Lime dashboards), `fe-03/` (homepage, current), `fe-02/` and `fe-01/` (previous designs).
+Status: FE-00 foundation; FE-02/FE-03 homepage (redesign, performance); FE-04 dashboard redesign, simplified in FE-05; Obsidian Black × Midnight Violet adopted and the dashboard surfaces refined (FE-06/FE-07). FE-08 completes the marketing website (ten pages). Awaiting visual review. Frontend only; **no backend, auth, billing or deployment exists.** Screenshots: `docs/screenshots/fe-07-dashboard-refined/` (dashboard, current), `fe-06-violet-preview/` (approved concepts), `fe-05/` and `fe-04/` (earlier Lime dashboards), `fe-03/` (homepage, current), `fe-02/` and `fe-01/` (previous designs).
 
 ## 1. Documentation reconciliation (resolved 2026-10-20)
 
@@ -118,6 +118,34 @@ FE-05 deliberately **reduced** the FE-04 dashboard. Guiding rule: if a chart, bu
 ## 8a. Midnight Violet adoption (2026-10-20)
 
 The two Midnight Violet concepts (`docs/screenshots/fe-06-violet-preview/`) were approved and adopted; the development-only `/preview` routes were removed. The palette now lives in the base roles of `styles/tokens.css`. The homepage uses the new centered hero (original orbital SVG artwork in `components/marketing/orbit-art.tsx`, CSS-only drift that rests under reduced motion) and every other section re-skins through tokens alone. The dashboard adopted the concept's trend lines and chart, then (FE-07) its surfaces were refined to be darker and more neutral, with a polished Light theme. `tokens.contrast.test.ts` checks all four palettes (light, dark, dashboard light, dashboard dark).
+
+## 8b. Marketing website (FE-08)
+
+Ten pages under `app/(marketing)`, all in the existing Obsidian Black × Midnight Violet system and on the shared header and footer. The homepage and the FE-07 dashboard were not redesigned; only their navigation links changed.
+
+| Page | What it is | Distinctive composition |
+|---|---|---|
+| `/platform` | Identities, permissions, approvals, activity, revocation, and a four-step workflow | Path-of-one-request diagram in the hero; five numbered rows alternating dark and light |
+| `/features` | Agent management, identity & access, permission policies, human approvals, activity & audit, n8n | Sticky "on this page" bar; six framed panels with status pills |
+| `/solutions` | Agencies, SaaS developers, businesses using AI agents, with illustrative examples | Per-audience visuals (client lanes, SDK sketch, approval and audit panels) and an honest fit check |
+| `/security` | Intended architecture, default deny, credentials, audit design, threats, gates | Built / designed / planned ledger, trust-boundary diagram, "what we do not claim" |
+| `/developers` | n8n-first strategy, request lifecycle, planned endpoints, trusted executor, example responses | Code-forward hero, workflow diagram, the nine contract statuses, proposed-contract labels |
+| `/pricing` | Plan shapes and what may differ, with **no prices** | Three working-name shapes, "size, not safety", FAQ |
+| `/about` | Mission, principles, vision, honest roadmap | Editorial statement, principles with scroll-drawn rule |
+| `/contact` | Pre-launch contact options and a form that never claims to send | Validated form with an explicit "nothing was sent" state |
+| `/privacy`, `/terms` | Clearly marked drafts | Contents rail, inline "needs review" flags, closing checklist |
+
+**Honesty rules (enforced by `marketing-pages.test.tsx`).** Every capability carries a `StatusPill` (`built`, `demo`, `designed`, `planned`, `proposed`, `draft`), so no page can imply something exists that does not. Pages may not mention certifications, compliance regimes, testimonials, prices or percentages except inside an element marked `data-not-claimed` (statements that *deny* a claim). The only external link is the public repository, with `rel="noopener noreferrer"`.
+
+**Contact form.** Client-side validation with an announced error summary and focus management. A valid submission makes **no network request** and shows "This form isn't connected yet. Nothing was sent.", keeping the visitor's text with Copy and Edit actions. There is no success state anywhere.
+
+**Reusable pieces** (`components/marketing/site/`): `PageHero` (CSS-only entrance, so titles never wait for JavaScript; split / centre / wide layouts), `FeatureRow` (window or plain treatment), `Window`, `SectionHeading`, `PageCta`, `StatusPill`, `Callout`, diagrams built from semantic lists (`AuthorizationFlow`, `TrustBoundary`, `PolicyPrecedence`, `RevocationTimeline`, `N8nWorkflow`, `ExecutorChecks`), `StatusLifecycle` (typed against the contract statuses), `ContactForm`, `LegalDocument` and `ReviewFlag`. Existing homepage panels (`IdentityPanel`, `RuleScan`, `ApprovalPanel`, `AuditPanel`, `IntegrationFlow`) and `CodeTabs` are reused.
+
+**Navigation.** `marketingNav` is the six primary pages; About, Contact, Privacy and Terms are in the footer (`companyNav`, `legalNav`). `navigation.test.ts` fails if any link has no page. The header marks the current page with `aria-current="page"`; the mobile menu lists the same pages.
+
+**Motion.** Hero entrances are CSS only. Below the fold, `Reveal`, `RevealStagger`, `ScrollLine` and `RuleScan` (GSAP, lazily loaded) animate opacity and transform only; reduced motion shows everything immediately and never loads GSAP.
+
+Open items before launch (entity details, contact addresses, pricing, legal review) are in `docs/FE-08-LAUNCH-BLOCKERS.md`.
 
 ## 8. Deferred on purpose
 

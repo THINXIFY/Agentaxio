@@ -1,37 +1,29 @@
 import Link from "next/link";
 import { Logo } from "@/components/brand/logo";
 import { Container } from "@/components/layout/container";
-import { HOME_SECTION_IDS } from "@/config/navigation";
+import { companyNav, legalNav, marketingNav } from "@/config/navigation";
 
-/** Only implemented destinations are links. Pages that do not exist yet are simply not listed. */
+/** Only implemented destinations are links. */
 const COLUMNS: ReadonlyArray<{
   title: string;
   links: ReadonlyArray<{ label: string; href: string }>;
 }> = [
-  {
-    title: "Explore",
-    links: [
-      { label: "Platform", href: `/#${HOME_SECTION_IDS.platform}` },
-      { label: "Product", href: `/#${HOME_SECTION_IDS.product}` },
-      { label: "How it works", href: `/#${HOME_SECTION_IDS.workflow}` },
-      { label: "Developers", href: `/#${HOME_SECTION_IDS.developers}` },
-      { label: "Pricing", href: `/#${HOME_SECTION_IDS.pricing}` },
-    ],
-  },
+  { title: "Product", links: marketingNav },
   {
     title: "Demo",
     links: [
       { label: "Dashboard overview", href: "/dashboard" },
-      { label: "Agents", href: "/dashboard/agents" },
-      { label: "Settings", href: "/dashboard/settings" },
+      { label: "My Agents", href: "/dashboard/agents" },
+      { label: "Integrations", href: "/dashboard/integrations" },
     ],
   },
+  { title: "Company", links: [...companyNav, ...legalNav] },
 ];
 
 export function MarketingFooter() {
   return (
     <footer className="surface-dark relative overflow-hidden border-t border-border">
-      <Container className="grid grid-cols-1 gap-10 pt-14 pb-10 sm:grid-cols-[1.4fr_1fr_1fr]">
+      <Container className="grid grid-cols-1 gap-10 pt-14 pb-10 sm:grid-cols-[1.4fr_1fr_1fr_1fr]">
         <div className="max-w-xs space-y-4">
           <Logo />
           <p className="text-sm leading-relaxed text-muted-foreground">
