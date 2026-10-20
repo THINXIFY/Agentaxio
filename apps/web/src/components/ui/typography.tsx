@@ -16,6 +16,10 @@ const headingVariants = cva("text-balance text-foreground", {
       "display-lg": "font-display text-display-lg font-semibold",
       "display-md": "font-display text-display-md font-semibold",
       "display-sm": "font-display text-display-sm font-semibold",
+      /* FE-09 page and chapter titles: smaller and tighter than the display scale, so a page title does not shout. */
+      page: "font-display text-[clamp(2.125rem,1.4rem+2.6vw,3.5rem)] leading-[1.05] font-semibold tracking-[-0.035em]",
+      chapter:
+        "font-display text-[clamp(1.625rem,1.25rem+1.3vw,2.375rem)] leading-[1.12] font-semibold tracking-[-0.028em]",
       xl: "text-2xl font-semibold tracking-tight",
       lg: "text-xl font-semibold tracking-tight",
       md: "text-lg font-semibold",

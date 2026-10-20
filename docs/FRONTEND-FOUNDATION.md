@@ -147,6 +147,8 @@ Ten pages under `app/(marketing)`, all in the existing Obsidian Black × Midnigh
 
 Open items before launch (entity details, contact addresses, pricing, legal review) are in `docs/FE-08-LAUNCH-BLOCKERS.md`.
 
+**FE-09 art direction (in review).** Platform, Features and Security were redesigned as the visual-quality benchmark: numbered chapters with an index margin, real dashboard components as the product demonstrations, a request-flow table, a security schematic, and status stated once per page instead of a pill on every block. The audit, decisions and rollout plan are in `docs/FE-09-ART-DIRECTION.md`. The other pages keep their FE-08 design until the direction is approved.
+
 ## 8. Deferred on purpose
 
 Authentication/sessions and role-based UI (server-side only), CSP (needs a nonce strategy with auth), remaining marketing pages (Pricing, Security, Contact, legal), real brand mark sign-off, error tracking, e2e tests in CI, i18n, billing. Baseline security headers are set in `next.config.ts`.

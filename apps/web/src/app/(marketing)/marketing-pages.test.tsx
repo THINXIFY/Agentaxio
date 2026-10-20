@@ -105,9 +105,9 @@ describe("pre-release honesty", () => {
 
   it("Security separates built, designed and planned, and claims no certification", () => {
     const { container } = render(<SecurityPage />);
-    for (const label of ["Built", "Designed · not built", "Planned"])
+    for (const label of ["Built", "Designed", "Planned"])
       expect(within(container).getAllByText(label).length).toBeGreaterThan(0);
-    expect(within(container).getByText("None claimed")).toBeInTheDocument();
+    expect(container.textContent).toMatch(/Certifications: none claimed/);
     expect(container.textContent).toMatch(/No certifications or compliance approvals/);
     expect(container.textContent).toMatch(/Cannot stop someone who still holds direct credentials/);
   });

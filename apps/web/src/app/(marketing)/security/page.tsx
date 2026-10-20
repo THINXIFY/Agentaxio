@@ -1,23 +1,28 @@
 import type { Metadata } from "next";
-import { Ban, Check } from "lucide-react";
-import { Container } from "@/components/layout/container";
-import { Section } from "@/components/layout/section";
-import { AuditPanel } from "@/components/marketing/feature-panels";
-import { MonoLabel, PageCta, SectionHeading, Window } from "@/components/marketing/site/blocks";
-import { Callout } from "@/components/marketing/site/callout";
-import { PolicyPrecedence, TrustBoundary } from "@/components/marketing/site/diagrams";
-import { PageHero } from "@/components/marketing/site/page-hero";
-import { StatusPill, type Availability } from "@/components/marketing/site/status-pill";
-import { Reveal, RevealStagger } from "@/components/motion/reveal";
-import { Heading, Text } from "@/components/ui/typography";
+import Link from "next/link";
+import { ArrowRight, Ban, FileWarning } from "lucide-react";
+import {
+  ArchitectureDiagram,
+  CredentialCustody,
+  EnforcementPoints,
+} from "@/components/marketing/art/architecture";
+import {
+  ArtHero,
+  Chapter,
+  Prose,
+  StatusMark,
+  StatusStrip,
+  type StatusKind,
+} from "@/components/marketing/art/chapter";
+import { Reveal } from "@/components/motion/reveal";
 
 export const metadata: Metadata = {
   title: "Security",
   description:
-    "AgentAxio’s intended security architecture: default-deny, scoped credentials, human approval, single-use grants and an audit trail. What is built, what is designed, and what we do not claim.",
+    "AgentAxio's intended security architecture: three zones, six enforcement points, where each secret lives, and exactly what is built, designed and planned. No certifications are claimed.",
 };
 
-const STATUS_ROWS: ReadonlyArray<{ status: Availability; title: string; note: string }> = [
+const LEDGER: ReadonlyArray<{ status: StatusKind; title: string; note: string }> = [
   {
     status: "built",
     title: "Website and demo dashboard",
@@ -31,7 +36,7 @@ const STATUS_ROWS: ReadonlyArray<{ status: Availability; title: string; note: st
   {
     status: "built",
     title: "No secrets in the browser",
-    note: "Only a short credential preview is shown, and nothing sensitive is stored client-side.",
+    note: "Only a short credential preview is shown. Nothing sensitive is stored client-side.",
   },
   {
     status: "built",
@@ -78,6 +83,12 @@ const STATUS_ROWS: ReadonlyArray<{ status: Availability; title: string; note: st
     title: "Independent security assessment",
     note: "Required before use with sensitive data or production credentials.",
   },
+];
+
+const COLUMNS: ReadonlyArray<{ status: StatusKind; heading: string; lead: string }> = [
+  { status: "built", heading: "Built", lead: "Exists today, on sample data" },
+  { status: "designed", heading: "Designed", lead: "Specified, not built" },
+  { status: "planned", heading: "Planned", lead: "On the roadmap, ahead of launch" },
 ];
 
 const THREATS: ReadonlyArray<{ threat: string; design: string }> = [
@@ -144,310 +155,223 @@ const NOT_CLAIMED = [
 export default function SecurityPage() {
   return (
     <>
-      <PageHero
-        eyebrow="Security"
-        title="Designed to keep an agent’s power small."
-        lead="Default-deny rules, scoped credentials, approvals by people, single-use grants and an honest audit trail. Most of this is designed and not yet built, and this page says which."
-        status={
-          <>
-            <StatusPill status="designed" label="Architecture: designed" />
-            <StatusPill status="planned" label="Independent review: planned" />
-          </>
-        }
-        aside={
-          <Window title="At a glance" status={<StatusPill status="draft" label="Pre-release" />}>
-            <dl className="divide-y divide-border">
-              <div className="flex items-start justify-between gap-4 pb-4">
-                <dt className="text-sm font-medium">Interface and demo</dt>
-                <dd>
-                  <StatusPill status="built" />
-                </dd>
-              </div>
-              <div className="flex items-start justify-between gap-4 py-4">
-                <dt className="text-sm font-medium">Enforcement backend</dt>
-                <dd>
-                  <StatusPill status="designed" />
-                </dd>
-              </div>
-              <div className="flex items-start justify-between gap-4 py-4">
-                <dt className="text-sm font-medium">Independent security assessment</dt>
-                <dd>
-                  <StatusPill status="planned" />
-                </dd>
-              </div>
-              <div className="flex items-start justify-between gap-4 pt-4" data-not-claimed="">
-                <dt className="text-sm font-medium">Certifications</dt>
-                <dd className="text-sm text-muted-foreground">None claimed</dd>
-              </div>
-            </dl>
-          </Window>
-        }
-      />
+      <ArtHero
+        label="Security"
+        title="No single part can decide, hold the keys, and act."
+        lead="AgentAxio is designed so that an agent never decides what it may do. This page shows where the boundaries are, where each secret lives, and which of it is designed rather than built."
+      >
+        <StatusStrip kinds={["designed", "planned"]}>
+          The architecture below is the intended design. It is not built or running, and no
+          independent review has been done.
+        </StatusStrip>
+        <ArchitectureDiagram className="mt-10" />
+      </ArtHero>
 
-      <Section tone="light" aria-labelledby="status-title" className="py-20 sm:py-28">
-        <Container className="grid grid-cols-1 gap-10 lg:grid-cols-12 lg:gap-16">
-          <div className="lg:col-span-4">
-            <SectionHeading
-              id="status-title"
-              eyebrow="What exists today"
-              title="Built, designed, planned."
-              lead="We separate what you can use now from what is specified and what is still ahead."
-            />
+      <Chapter
+        id="enforcement"
+        index="01"
+        label="Enforcement points"
+        round
+        wide
+        title="Six boundaries, and what is enforced at each."
+        lead="Wherever one zone meets another, something is checked. These are the numbered points in the schematic."
+      >
+        <Reveal>
+          <EnforcementPoints />
+        </Reveal>
+      </Chapter>
+
+      <Chapter
+        id="credentials"
+        index="02"
+        label="Credentials"
+        wide
+        title="Each secret lives in exactly one place."
+        lead="The agent never holds the tool’s credentials, the workflow never sees the grant, and the browser holds no long-lived secret."
+      >
+        <Reveal>
+          <CredentialCustody />
+        </Reveal>
+      </Chapter>
+
+      <Chapter
+        id="failure"
+        index="03"
+        label="Failure and audit"
+        tone="dark"
+        title="When something fails, nothing runs. What happened is written down."
+      >
+        <Reveal className="grid grid-cols-1 gap-10 md:grid-cols-2 md:gap-0 md:divide-x md:divide-border">
+          <div className="md:pr-10">
+            <p className="font-mono text-xs tracking-[0.12em] text-muted-foreground uppercase">
+              Rules and failure
+            </p>
+            <Prose className="mt-4 text-base">
+              <p>
+                Rules are deterministic and the default is blocked. The same request always gets the
+                same answer, and no AI model takes part.
+              </p>
+              <p>
+                If AgentAxio or its database can’t be reached, or anything errors, protected actions
+                are denied. There is no implicit approval.
+              </p>
+            </Prose>
           </div>
-          <Reveal className="lg:col-span-8">
-            <ul className="divide-y divide-border border-y border-border">
-              {STATUS_ROWS.map((r) => (
-                <li
-                  key={r.title}
-                  className="grid grid-cols-1 gap-x-6 gap-y-2 py-5 sm:grid-cols-[1fr_auto] sm:items-start"
-                >
-                  <div>
-                    <p className="text-base font-medium">{r.title}</p>
-                    <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{r.note}</p>
-                  </div>
-                  <StatusPill status={r.status} className="w-fit sm:mt-0.5" />
-                </li>
-              ))}
-            </ul>
-          </Reveal>
-        </Container>
-      </Section>
-
-      <Section
-        tone="dark"
-        aria-labelledby="boundaries-title"
-        className="border-t border-border py-20 sm:py-28"
-      >
-        <Container>
-          <SectionHeading
-            id="boundaries-title"
-            eyebrow="Architecture"
-            title="Three zones, and who is trusted with what."
-            lead="An agent proposes. AgentAxio decides and records. A separate trusted executor holds the tool’s credentials and acts. No single part can do all three."
-          />
-          <Reveal y={32} className="mt-12">
-            <TrustBoundary />
-          </Reveal>
-          <div className="mt-8">
-            <Callout tone="scope" title="The limit of this design">
-              Only actions routed through AgentAxio are controlled. If a workflow or administrator
-              still holds direct credentials to a tool, they can act without it.
-            </Callout>
+          <div className="md:pl-10">
+            <p className="font-mono text-xs tracking-[0.12em] text-muted-foreground uppercase">
+              The record
+            </p>
+            <Prose className="mt-4 text-base">
+              <p>
+                Authorization and execution are separate entries, so “approved” never reads as
+                “done”. Each names the requester, the action, the policy version, the decision and
+                the approver.
+              </p>
+              <p>
+                Written append-only by a restricted writer, with the tamper-evidence strategy still
+                to be chosen. Secrets, raw authorization headers and sensitive values are never
+                logged.
+              </p>
+            </Prose>
           </div>
-        </Container>
-      </Section>
+        </Reveal>
+      </Chapter>
 
-      <Section tone="light" aria-labelledby="deny-title" className="py-20 sm:py-28">
-        <Container className="grid grid-cols-1 items-center gap-12 lg:grid-cols-12 lg:gap-16">
-          <Reveal className="lg:col-span-5">
-            <SectionHeading
-              id="deny-title"
-              eyebrow="Default deny"
-              title="If no rule says yes, the answer is no."
-              lead="Rules are checked in a fixed order and always give the same answer to the same request. No AI model is involved in the decision."
-            />
-          </Reveal>
-          <Reveal y={32} delay={0.08} className="lg:col-span-7">
-            <Window title="Which rule wins" status={<StatusPill status="designed" />}>
-              <PolicyPrecedence />
-            </Window>
-          </Reveal>
-        </Container>
-      </Section>
-
-      <Section
-        tone="dark"
-        aria-labelledby="credentials-title"
-        className="border-t border-border py-20 sm:py-28"
+      <Chapter
+        id="status"
+        index="04"
+        label="What exists today"
+        wide
+        title="Built, designed, planned. Kept apart."
+        lead="We separate what you can use now from what is specified and what is still ahead."
       >
-        <Container>
-          <SectionHeading
-            id="credentials-title"
-            eyebrow="Credential handling"
-            title="Each secret lives in exactly one place."
-          />
-          <RevealStagger
-            stagger={0.1}
-            className="mt-12 grid grid-cols-1 gap-10 md:grid-cols-3 md:gap-0 md:divide-x md:divide-border"
-          >
-            {[
-              {
-                title: "Agent credentials",
-                points: [
-                  "One per agent and environment",
-                  "Stored hashed, shown once at creation",
-                  "Rotate or revoke at any time",
-                ],
-              },
-              {
-                title: "The tool’s credentials",
-                points: [
-                  "Held only by the trusted executor",
-                  "Never placed in an agent or workflow",
-                  "Never sent to the browser",
-                ],
-              },
-              {
-                title: "People",
-                points: [
-                  "Established sign-in and session handling, not home-grown",
-                  "Role checks on the server; labels in the interface confer nothing",
-                  "Approvers are separate from requesters",
-                ],
-              },
-            ].map((c) => (
-              <div key={c.title} data-reveal-item="" className="md:px-8 md:first:pl-0 md:last:pr-0">
-                <Heading level={3} size="md">
-                  {c.title}
-                </Heading>
-                <ul className="mt-4 space-y-3">
-                  {c.points.map((p) => (
-                    <li key={p} className="flex gap-3 text-base leading-snug text-muted-foreground">
-                      <Check
-                        className="mt-1 size-4 shrink-0 text-primary-text"
-                        aria-hidden="true"
-                      />
-                      {p}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </RevealStagger>
-        </Container>
-      </Section>
-
-      <Section tone="light" aria-labelledby="audit-title" className="py-20 sm:py-28">
-        <Container className="grid grid-cols-1 items-center gap-12 lg:grid-cols-12 lg:gap-16">
-          <Reveal y={32} className="lg:order-2 lg:col-span-6">
-            <Window title="Activity history" status={<StatusPill status="demo" />}>
-              <AuditPanel />
-            </Window>
-          </Reveal>
-          <Reveal className="lg:col-span-6">
-            <SectionHeading
-              id="audit-title"
-              eyebrow="Audit design"
-              title="A record that is honest about what happened."
-            />
-            <ul className="mt-8 space-y-4">
-              {[
-                "Authorization and execution are separate entries, so “approved” never reads as “done”",
-                "Each record names the requester, the action, the policy version, the decision and the approver",
-                "Written append-only by a restricted writer, with a tamper-evidence strategy still to be chosen",
-                "Never logs secrets, raw authorization headers or sensitive values",
-              ].map((p) => (
-                <li key={p} className="flex gap-3 text-base leading-relaxed">
-                  <Check className="mt-1.5 size-4 shrink-0 text-primary-text" aria-hidden="true" />
-                  {p}
-                </li>
-              ))}
-            </ul>
-          </Reveal>
-        </Container>
-      </Section>
-
-      <Section
-        tone="dark"
-        aria-labelledby="threats-title"
-        className="border-t border-border py-20 sm:py-28"
-      >
-        <Container>
-          <SectionHeading
-            id="threats-title"
-            eyebrow="Threats we design against"
-            title="Eight things that go wrong, and the intended answer."
-            lead="Each one will need an automated test before the related feature is allowed to ship."
-          />
-          <Reveal y={28} className="mt-12">
-            <div className="hidden grid-cols-[1fr_1.2fr] gap-8 border-b border-border pb-3 md:grid">
-              <MonoLabel>Threat</MonoLabel>
-              <MonoLabel>Intended design</MonoLabel>
+        <Reveal className="grid grid-cols-1 gap-12 md:grid-cols-3 md:gap-0 md:divide-x md:divide-border-strong/50">
+          {COLUMNS.map((c) => (
+            <div key={c.status} className="md:px-7 md:first:pl-0 md:last:pr-0">
+              <StatusMark status={c.status} className="text-sm text-foreground">
+                {c.heading}
+              </StatusMark>
+              <p className="mt-1.5 text-sm text-muted-foreground">{c.lead}</p>
+              <ul className="mt-5 space-y-5 border-t border-border-strong/50 pt-5">
+                {LEDGER.filter((l) => l.status === c.status).map((l) => (
+                  <li key={l.title}>
+                    <p className="text-[0.9375rem] leading-snug font-medium">{l.title}</p>
+                    <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{l.note}</p>
+                  </li>
+                ))}
+              </ul>
             </div>
-            <ul className="divide-y divide-border">
-              {THREATS.map((t) => (
-                <li
-                  key={t.threat}
-                  className="grid grid-cols-1 gap-1.5 py-5 md:grid-cols-[1fr_1.2fr] md:gap-8"
-                >
-                  <p className="text-base font-medium">{t.threat}</p>
-                  <p className="text-base leading-relaxed text-muted-foreground">{t.design}</p>
-                </li>
-              ))}
-            </ul>
-          </Reveal>
-        </Container>
-      </Section>
+          ))}
+        </Reveal>
+        <p
+          data-not-claimed=""
+          className="mt-10 border-t border-border-strong/50 pt-5 font-mono text-xs tracking-[0.08em] text-muted-foreground uppercase"
+        >
+          Certifications: none claimed
+        </p>
+      </Chapter>
 
-      <Section tone="light" aria-labelledby="gates-title" className="py-20 sm:py-28">
-        <Container>
-          <SectionHeading
-            id="gates-title"
-            eyebrow="Before launch"
-            title="Three gates, none yet reached."
-            lead="Visual polish does not substitute for security tests. Each gate has to pass before the next kind of use is allowed."
-          />
-          <RevealStagger
-            as="ol"
-            stagger={0.1}
-            className="mt-12 grid grid-cols-1 gap-8 md:grid-cols-3"
-          >
-            {GATES.map((g) => (
-              <li key={g.n} data-reveal-item="" className="border-t-2 border-border-strong pt-5">
-                <p className="font-mono text-xs text-primary-text">{g.n}</p>
-                <h3 className="mt-2 text-xl font-semibold tracking-tight">{g.title}</h3>
-                <p className="mt-2 text-base leading-relaxed text-muted-foreground">{g.text}</p>
-                <StatusPill status="planned" label="Not yet reached" className="mt-4" />
+      <Chapter
+        id="threats"
+        index="05"
+        label="Threats"
+        tone="dark"
+        wide
+        title="Eight things that go wrong, and the intended answer."
+        lead="Each one will need an automated test before the related feature is allowed to ship."
+      >
+        <Reveal>
+          <div className="hidden grid-cols-[1fr_1.2fr] gap-8 border-b border-border pb-3 md:grid">
+            <p className="font-mono text-xs tracking-[0.12em] text-muted-foreground uppercase">
+              Threat
+            </p>
+            <p className="font-mono text-xs tracking-[0.12em] text-muted-foreground uppercase">
+              Intended design
+            </p>
+          </div>
+          <ul className="divide-y divide-border">
+            {THREATS.map((t) => (
+              <li
+                key={t.threat}
+                className="grid grid-cols-1 gap-1 py-4 md:grid-cols-[1fr_1.2fr] md:gap-8"
+              >
+                <p className="text-base font-medium">{t.threat}</p>
+                <p className="text-base leading-relaxed text-muted-foreground">{t.design}</p>
               </li>
             ))}
-          </RevealStagger>
-        </Container>
-      </Section>
+          </ul>
+        </Reveal>
+      </Chapter>
 
-      <Section
-        tone="dark"
-        aria-labelledby="claims-title"
-        className="border-t border-border py-20 sm:py-28"
+      <Chapter
+        id="gates"
+        index="06"
+        label="Before launch"
+        wide
+        title="Three gates, none yet reached."
+        lead="Visual polish does not substitute for security tests. Each gate has to pass before the next kind of use is allowed."
       >
-        <Container className="grid grid-cols-1 gap-10 lg:grid-cols-12 lg:gap-16">
-          <div className="lg:col-span-5">
-            <SectionHeading
-              id="claims-title"
-              eyebrow="What we do not claim"
-              title="Plainly, so you don’t have to ask."
-            />
-          </div>
-          <Reveal className="space-y-8 lg:col-span-7">
-            <ul className="space-y-4" data-not-claimed="">
-              {NOT_CLAIMED.map((x) => (
-                <li key={x} className="flex gap-3 text-lg leading-snug">
-                  <Ban
-                    className="mt-1.5 size-4 shrink-0 text-muted-foreground"
-                    aria-hidden="true"
-                  />
-                  {x}
-                </li>
-              ))}
-            </ul>
-            <Callout tone="review" title="Reporting a vulnerability">
-              A security contact address and a disclosure process will be published before any
-              private beta. Until then there is no live product to report against. This needs to be
-              set up by the founders before launch.
-            </Callout>
-            <Text variant="muted">
+        <Reveal>
+          <ol className="grid grid-cols-1 gap-8 md:grid-cols-3 md:gap-0 md:divide-x md:divide-border-strong/50">
+            {GATES.map((g) => (
+              <li key={g.n} className="md:px-7 md:first:pl-0 md:last:pr-0">
+                <p className="font-mono text-xs text-primary-text">{g.n}</p>
+                <h3 className="mt-2 text-lg font-semibold tracking-tight">{g.title}</h3>
+                <p className="mt-2 text-base leading-relaxed text-muted-foreground">{g.text}</p>
+                <StatusMark status="planned" className="mt-4 text-muted-foreground">
+                  Not yet reached
+                </StatusMark>
+              </li>
+            ))}
+          </ol>
+        </Reveal>
+      </Chapter>
+
+      <Chapter
+        id="limits"
+        index="07"
+        label="What we do not claim"
+        tone="dark"
+        title="Plainly, so you don’t have to ask."
+      >
+        <Reveal className="grid grid-cols-1 gap-10 lg:grid-cols-2 lg:gap-16">
+          <ul data-not-claimed="" className="space-y-4">
+            {NOT_CLAIMED.map((x) => (
+              <li key={x} className="flex gap-3 text-lg leading-snug">
+                <Ban className="mt-1.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                {x}
+              </li>
+            ))}
+          </ul>
+          <div className="space-y-5">
+            <div className="border-l-2 border-warning-border pl-5">
+              <p className="flex items-center gap-2 text-base font-semibold text-warning-text">
+                <FileWarning className="size-4" aria-hidden="true" />
+                Reporting a vulnerability
+              </p>
+              <p className="mt-2 text-base leading-relaxed text-muted-foreground">
+                A security contact address and a disclosure process will be published before any
+                private beta. Until then there is no live product to report against. This needs to
+                be set up by the founders before launch.
+              </p>
+            </div>
+            <p className="text-sm text-muted-foreground">
               This page describes intent and the current state, not a guarantee. It will change as
               parts are built and reviewed.
-            </Text>
-          </Reveal>
-        </Container>
-      </Section>
-
-      <PageCta
-        title="Questions about the approach?"
-        text="Read the developer overview for the proposed API, or tell us what you would need to see before trusting a control layer."
-        primary={{ href: "/developers", label: "Developer overview" }}
-        secondary={{ href: "/contact", label: "Get in touch" }}
-      />
+            </p>
+            <Link
+              href="/developers"
+              className="group inline-flex items-center gap-2 text-base font-medium text-primary-text underline-offset-4 hover:underline"
+            >
+              Read the proposed developer contract
+              <ArrowRight
+                aria-hidden="true"
+                className="size-4 transition-transform duration-200 ease-standard group-hover:translate-x-0.5"
+              />
+            </Link>
+          </div>
+        </Reveal>
+      </Chapter>
     </>
   );
 }

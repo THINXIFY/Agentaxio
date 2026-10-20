@@ -156,3 +156,46 @@
 .orbit-breathe {
   animation: ax-breathe 6s ease-in-out infinite;
 }
+
+/*
+ * Request-flow diagram (FE-09): a small dot hops along each connector in turn, and each station number lights briefly as
+ * the dot reaches it. Purely a hint of direction. Reduced motion collapses it to the resting state (base.css).
+ */
+@keyframes ax-hop {
+  0% {
+    left: 0;
+    opacity: 1;
+  }
+  15% {
+    left: 100%;
+    opacity: 1;
+  }
+  16%,
+  100% {
+    left: 100%;
+    opacity: 0;
+  }
+}
+
+.flow-dot {
+  opacity: 0;
+  animation: ax-hop 7s linear infinite;
+  animation-delay: calc(var(--i, 0) * 1.2s - 7s);
+}
+
+@keyframes ax-station {
+  0%,
+  16%,
+  100% {
+    background-color: transparent;
+  }
+  6%,
+  11% {
+    background-color: color-mix(in srgb, var(--primary) 24%, transparent);
+  }
+}
+
+.flow-station {
+  animation: ax-station 7s ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * 1.2s - 7s);
+}
