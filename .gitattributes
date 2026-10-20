@@ -1,0 +1,14 @@
+# Store and check out text as LF on every platform. Without this, Git for Windows converts to CRLF on checkout
+# and `prettier --check` (which expects LF) fails on a fresh clone.
+* text=auto eol=lf
+
+# Binary assets: never touch line endings or diff as text.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.woff binary
+*.woff2 binary
+*.pdf binary

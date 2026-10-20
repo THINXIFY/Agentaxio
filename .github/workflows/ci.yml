@@ -1,0 +1,82 @@
+name: CI
+
+# Runs on every pull request and on every push to main. Read-only: it never deploys, publishes or needs a secret.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Format, lint, types, tests, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      # The exact pnpm version comes from "packageManager" in the root package.json.
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Prettier
+        run: pnpm format:check
+
+      - name: ESLint
+        run: pnpm lint
+
+      - name: TypeScript
+        run: pnpm typecheck
+
+      - name: Vitest
+        run: pnpm test
+
+      - name: Production build
+        run: pnpm build
+
+  repo-hygiene:
+    name: Secrets and environment files
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: No environment files or key material are tracked
+        run: |
+          set -u
+          bad=$(git ls-files | grep -E '(^|/)\.env($|\.)' | grep -v -E '(^|/)\.env\.example$' || true)
+          keys=$(git ls-files | grep -E '\.(pem|key|p12|pfx|jks|keystore)$|(^|/)(id_rsa|id_ed25519)' || true)
+          if [ -n "$bad$keys" ]; then
+            echo "Tracked files that must never be committed:"
+            echo "$bad"
+            echo "$keys"
+            exit 1
+          fi
+          echo "No tracked .env files (other than .env.example) or key files."
+
+      - name: No obvious secrets in tracked files
+        run: |
+          set -u
+          pattern='sk-[A-Za-z0-9_-]{20,}|sk_live_|ghp_[A-Za-z0-9]{20,}|github_pat_|gho_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{30,}|xox[abp]-[0-9A-Za-z-]{10,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|_authToken'
+          if git grep -InE "$pattern" -- . ':!pnpm-lock.yaml' ':!.github/workflows/ci.yml'; then
+            echo "Possible secret found above."
+            exit 1
+          fi
+          echo "No obvious secrets found."
