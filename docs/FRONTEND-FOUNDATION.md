@@ -147,7 +147,7 @@ Ten pages under `app/(marketing)`, all in the existing Obsidian Black × Midnigh
 
 Open items before launch (entity details, contact addresses, pricing, legal review) are in `docs/FE-08-LAUNCH-BLOCKERS.md`.
 
-**FE-09 art direction (in review).** Platform, Features and Security were redesigned as the visual-quality benchmark: numbered chapters with an index margin, real dashboard components as the product demonstrations, a request-flow table, a security schematic, and status stated once per page instead of a pill on every block. The audit, decisions and rollout plan are in `docs/FE-09-ART-DIRECTION.md`. The other pages keep their FE-08 design until the direction is approved.
+**FE-09 art direction.** All ten marketing pages follow one editorial system: a restrained hero with a single status strip, numbered chapters with the index in the margin, status words instead of pills, product shown with the real dashboard components (labelled conceptual), and an ending specific to each page. The audit, decisions and rollout are in `docs/FE-09-ART-DIRECTION.md`. The FE-08 component set it replaced has been removed.
 
 ## 8. Deferred on purpose
 

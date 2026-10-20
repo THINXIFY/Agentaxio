@@ -2,10 +2,7 @@ import * as React from "react";
 import { FileWarning } from "lucide-react";
 import { Container } from "@/components/layout/container";
 import { Section } from "@/components/layout/section";
-import { Callout } from "@/components/marketing/site/callout";
-import { PageHero } from "@/components/marketing/site/page-hero";
-import { StatusPill } from "@/components/marketing/site/status-pill";
-import { MonoLabel } from "@/components/marketing/site/blocks";
+import { ArtHero, IndexMark, StatusStrip } from "@/components/marketing/art/chapter";
 
 export interface LegalSection {
   id: string;
@@ -29,7 +26,7 @@ export function ReviewFlag({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** A draft legal page: clear banner, table of contents, numbered sections and a review checklist. */
+/** A draft legal page: clear banner, a contents rail, numbered sections and a review checklist. */
 export function LegalDocument({
   title,
   lead,
@@ -46,24 +43,21 @@ export function LegalDocument({
 }) {
   return (
     <>
-      <PageHero
-        layout="wide"
-        eyebrow="Legal · draft"
-        title={title}
-        lead={lead}
-        status={
-          <>
-            <StatusPill status="draft" label="Draft · not reviewed · not in effect" />
-            <StatusPill status="planned" label={`Last drafted ${updated}`} />
-          </>
-        }
-      />
+      <ArtHero label="Legal · draft" title={title} lead={lead}>
+        <StatusStrip kinds={[]}>
+          Draft · not reviewed · not in effect. Last drafted {updated}.
+        </StatusStrip>
+      </ArtHero>
 
-      <Section tone="light" aria-label={`${title}, full text`} className="py-16 sm:py-24">
+      <Section
+        tone="light"
+        aria-label={`${title}, full text`}
+        className="relative z-10 -mt-5 rounded-t-panel py-12 sm:py-[4.5rem]"
+      >
         <Container className="grid grid-cols-1 gap-12 lg:grid-cols-12 lg:gap-16">
           <nav aria-label="On this page" className="lg:col-span-3">
             <div className="lg:sticky lg:top-24">
-              <MonoLabel>Contents</MonoLabel>
+              <IndexMark index="§" label="Contents" className="lg:static" />
               <ol className="mt-4 space-y-2 text-sm">
                 {sections.map((s, i) => (
                   <li key={s.id}>
@@ -94,11 +88,19 @@ export function LegalDocument({
           </nav>
 
           <div className="space-y-12 lg:col-span-9">
-            <Callout tone="review" title="This is a draft, not a legal document in force">
-              It has not been reviewed by a lawyer and does not bind anyone. It describes the
-              pre-release website as it behaves today. Highlighted gaps must be filled in by the
-              founders, and the whole text reviewed, before publication.
-            </Callout>
+            <p
+              role="note"
+              className="max-w-3xl border-l-2 border-warning-border pl-5 text-base leading-relaxed"
+            >
+              <strong className="font-semibold text-warning-text">
+                This is a draft, not a legal document in force.
+              </strong>{" "}
+              <span className="text-foreground/90">
+                It has not been reviewed by a lawyer and does not bind anyone. It describes the
+                pre-release website as it behaves today. Highlighted gaps must be filled in by the
+                founders, and the whole text reviewed, before publication.
+              </span>
+            </p>
 
             {sections.map((s, i) => (
               <section

@@ -115,7 +115,7 @@ describe("pre-release honesty", () => {
   it("Developers labels the API as a proposed, unimplemented contract", () => {
     const { container } = render(<DevelopersPage />);
     expect(within(container).getAllByText(/Proposed contract/).length).toBeGreaterThan(0);
-    expect(container.textContent).toMatch(/API not available yet/);
+    expect(container.textContent).toMatch(/API is not available yet/);
     // The status vocabulary is the contract's, all nine of them.
     for (const s of [
       "denied",

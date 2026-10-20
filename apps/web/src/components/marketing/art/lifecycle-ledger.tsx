@@ -1,59 +1,57 @@
 import * as React from "react";
 import { ArrowRight } from "lucide-react";
-import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { Code } from "@/components/ui/typography";
 import type { ActionRequestStatus } from "@/lib/contracts";
+import { cn } from "@/lib/cn";
 
 /**
- * The status vocabulary from docs/N8N-ENFORCEMENT.md (authoritative). Typed against the contract, so adding or renaming a
- * status there fails type-checking here until this page is updated.
+ * The status vocabulary from docs/N8N-ENFORCEMENT.md (authoritative), typed against the contract: adding or renaming a
+ * status there fails type-checking here until this page is updated. Colour is never the only signal: every status is
+ * its own name in text.
  */
-const STATUS_DOC: Record<
-  ActionRequestStatus,
-  { tone: NonNullable<BadgeProps["tone"]>; final: boolean; meaning: string }
-> = {
+const DOC: Record<ActionRequestStatus, { text: string; final: boolean; meaning: string }> = {
   pending_approval: {
-    tone: "warning",
+    text: "text-warning-text",
     final: false,
     meaning: "A person must review the exact values. Nothing runs yet, and no token is returned.",
   },
   approved: {
-    tone: "info",
+    text: "text-info-text",
     final: false,
     meaning: "A person said yes. Approval is permission, not proof that the action has happened.",
   },
   queued_execution: {
-    tone: "info",
+    text: "text-info-text",
     final: false,
     meaning: "Allowed (directly or after approval) and waiting for the trusted executor.",
   },
   running: {
-    tone: "info",
+    text: "text-info-text",
     final: false,
     meaning: "The trusted executor is performing the action.",
   },
   succeeded: {
-    tone: "success",
+    text: "text-success-text",
     final: true,
     meaning: "The action ran and its outcome was recorded.",
   },
   failed: {
-    tone: "danger",
+    text: "text-danger-text",
     final: true,
     meaning: "It was allowed, but the action failed when it ran.",
   },
   denied: {
-    tone: "danger",
+    text: "text-danger-text",
     final: true,
     meaning: "A rule blocked it. Returned immediately, and nothing runs.",
   },
   expired: {
-    tone: "neutral",
+    text: "text-muted-foreground",
     final: true,
     meaning: "Nobody approved it in time, so it did not run.",
   },
   unknown: {
-    tone: "warning",
+    text: "text-warning-text",
     final: true,
     meaning: "The outcome can’t be confirmed. Never repeated automatically.",
   },
@@ -67,21 +65,18 @@ const MAIN_PATH: readonly ActionRequestStatus[] = [
   "succeeded",
 ];
 
-/** The usual route a request takes, then every status with what it means. */
-export function StatusLifecycle() {
+export function LifecycleLedger() {
   return (
     <div>
       <ol
         aria-label="The usual route of a request"
-        className="flex flex-wrap items-center gap-x-2 gap-y-3"
+        className="flex flex-wrap items-center gap-x-2 gap-y-2 font-mono text-sm"
       >
         {MAIN_PATH.map((s, i) => (
           <li key={s} className="flex items-center gap-2">
-            <Badge tone={STATUS_DOC[s].tone} className="font-mono">
-              {s}
-            </Badge>
+            <span className={DOC[s].text}>{s}</span>
             {i < MAIN_PATH.length - 1 ? (
-              <ArrowRight className="size-4 text-muted-foreground" aria-hidden="true" />
+              <ArrowRight className="size-3.5 text-muted-foreground" aria-hidden="true" />
             ) : null}
           </li>
         ))}
@@ -91,22 +86,16 @@ export function StatusLifecycle() {
         <Code>approved</Code> and goes straight to <Code>queued_execution</Code>.
       </p>
 
-      <dl className="mt-8 divide-y divide-border border-y border-border">
-        {(Object.keys(STATUS_DOC) as ActionRequestStatus[]).map((s) => (
+      <dl className="mt-8 border-t border-border">
+        {(Object.keys(DOC) as ActionRequestStatus[]).map((s) => (
           <div
             key={s}
-            className="grid grid-cols-1 gap-x-6 gap-y-1.5 py-4 sm:grid-cols-[13rem_1fr_auto] sm:items-baseline"
+            className="grid grid-cols-1 gap-x-8 gap-y-1 border-b border-border py-4 sm:grid-cols-[12rem_minmax(0,1fr)_5.5rem] sm:items-baseline"
           >
-            <dt>
-              <Badge tone={STATUS_DOC[s].tone} className="font-mono">
-                {s}
-              </Badge>
-            </dt>
-            <dd className="text-sm leading-relaxed text-muted-foreground">
-              {STATUS_DOC[s].meaning}
-            </dd>
-            <dd className="font-mono text-xs text-muted-foreground">
-              {STATUS_DOC[s].final ? "final" : "in progress"}
+            <dt className={cn("font-mono text-sm", DOC[s].text)}>{s}</dt>
+            <dd className="text-base leading-relaxed text-muted-foreground">{DOC[s].meaning}</dd>
+            <dd className="font-mono text-xs text-muted-foreground sm:text-right">
+              {DOC[s].final ? "final" : "in progress"}
             </dd>
           </div>
         ))}

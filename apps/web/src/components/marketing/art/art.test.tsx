@@ -7,7 +7,10 @@ import {
   CredentialCustody,
   EnforcementPoints,
 } from "@/components/marketing/art/architecture";
+import { CodeBlock } from "@/components/marketing/art/code-block";
+import { ContractSequence } from "@/components/marketing/art/contract-sequence";
 import { FeatureShowcase } from "@/components/marketing/art/feature-showcase";
+import { LifecycleLedger } from "@/components/marketing/art/lifecycle-ledger";
 import { RequestFlow } from "@/components/marketing/art/request-flow";
 import { axe } from "@/test/axe";
 
@@ -160,5 +163,55 @@ describe("FeatureShowcase", () => {
       await user.click(tab);
       expect(await axe(container)).toHaveNoViolations();
     }
+  });
+});
+
+describe("Developer contract", () => {
+  it("walks one request from proposal to outcome, in five steps", () => {
+    const { container } = render(<ContractSequence />);
+    const steps = screen.getByRole("list", { name: /One request, from proposal to outcome/ });
+    expect(steps.children).toHaveLength(5);
+    expect(container.textContent).toContain("POST /v1/action-requests");
+    expect(container.textContent).toMatch(/Idempotency-Key/);
+    expect(container.textContent).toMatch(
+      /No grant or execution token is returned to the workflow/,
+    );
+    // The key placeholder is a placeholder, never something that looks like a real secret.
+    expect(container.textContent).toMatch(/Bearer <scoped-agent-key>/);
+    expect(container.textContent).not.toMatch(/agx_[a-z]+_[A-Za-z0-9]{6,}/);
+  });
+
+  it("lists the nine contract statuses and marks which are final", () => {
+    const { container } = render(<LifecycleLedger />);
+    const defs = [...container.querySelectorAll("dt")].map((d) => d.textContent);
+    expect(defs).toEqual([
+      "pending_approval",
+      "approved",
+      "queued_execution",
+      "running",
+      "succeeded",
+      "failed",
+      "denied",
+      "expired",
+      "unknown",
+    ]);
+    expect(container.textContent).toMatch(/Approval is permission, not proof/);
+    expect(container.textContent!.match(/final/g)!.length).toBeGreaterThanOrEqual(5);
+  });
+
+  it("code blocks are keyboard-reachable scrollable regions", () => {
+    render(<CodeBlock label="Request" json={"{}"} />);
+    const region = screen.getByRole("region", { name: "Request (scrollable)" });
+    expect(region).toHaveAttribute("tabindex", "0");
+  });
+
+  it("has no axe violations", async () => {
+    const { container } = render(
+      <>
+        <ContractSequence />
+        <LifecycleLedger />
+      </>,
+    );
+    expect(await axe(container)).toHaveNoViolations();
   });
 });

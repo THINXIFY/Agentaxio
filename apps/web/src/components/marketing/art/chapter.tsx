@@ -1,4 +1,6 @@
 import * as React from "react";
+import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 import { Container } from "@/components/layout/container";
 import { Section } from "@/components/layout/section";
 import { Reveal } from "@/components/motion/reveal";
@@ -248,5 +250,33 @@ export function StatusStrip({
         ))}
       </ul>
     </aside>
+  );
+}
+
+/** A quiet row of arrow links: how a page ends, instead of a centred call-to-action band. */
+export function ArrowLinks({
+  links,
+  className,
+}: {
+  links: ReadonlyArray<{ href: string; label: string }>;
+  className?: string;
+}) {
+  return (
+    <ul className={cn("flex flex-wrap gap-x-8 gap-y-3 text-base", className)}>
+      {links.map((l) => (
+        <li key={l.href}>
+          <Link
+            href={l.href}
+            className="group inline-flex items-center gap-2 font-medium text-primary-text underline-offset-4 hover:underline"
+          >
+            {l.label}
+            <ArrowRight
+              aria-hidden="true"
+              className="size-4 transition-transform duration-200 ease-standard group-hover:translate-x-0.5"
+            />
+          </Link>
+        </li>
+      ))}
+    </ul>
   );
 }

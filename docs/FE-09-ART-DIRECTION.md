@@ -1,6 +1,6 @@
 # FE-09 — Art direction audit and the new benchmark
 
-Status: Platform, Features and Security redesigned as the visual-quality benchmark (branch `fe-09-art-direction`, from the approved FE-08 work). **Developers, Solutions, Pricing, About, Contact, Privacy and Terms are intentionally unchanged** until this direction is approved. Before and after screenshots: `docs/screenshots/fe-09/before` and `after`.
+Status: art direction approved on the Platform, Features and Security benchmark, then rolled out to every marketing page (branch `fe-09-art-direction`, from the approved FE-08 work). Before and after screenshots: `docs/screenshots/fe-09/before` (benchmark pages) and `after` (all ten pages).
 
 ## 1. Audit of the FE-08 pages (what was generic, and where)
 
@@ -44,10 +44,21 @@ All product visuals carry "Conceptual demo · invented data · not connected" (f
 
 The FE-07 dashboard, the homepage and its orbital hero, all routes, the six-page navigation, accessibility, legal disclaimers and pricing decisions. Remaining pages keep their FE-08 design until this direction is approved.
 
-## 5. If approved: the rollout plan
+## 5. Rollout (done after approval)
 
-1. Developers: code-forward composition with the proposed contract as the centrepiece (a real request/response/poll sequence, the nine-status lifecycle as a diagram), same chapter structure.
-2. Solutions: one chapter per audience, each with a real demonstration (per-client agents, a policy for a SaaS agent, an approver's day).
-3. Pricing, About, Contact: calmer, typographic compositions, with distinct endings.
-4. Privacy and Terms: refine reading experience only.
-5. Remove the now-unused FE-08 pieces (`PageHero`, `FeatureRow`, `Window`, `PageCta`, `TrustBoundary`, and so on) once no page uses them.
+| Page | Composition | Product shown |
+|---|---|---|
+| Developers | Hero that is the proposed contract itself: one request as a five-step sequence (workflow → AgentAxio → reviewer → executor → workflow) with readable, highlighted request and response bodies | Request, decision and status bodies; the nine-status lifecycle as a typographic ledger; the n8n workflow as a numbered strip |
+| Solutions | One chapter per audience, each with a different arrangement (text / demo, demo / text, two demos under the text) | Real dashboard components: per-client agents, an approval card with the dashboard's disabled controls, activity records with Details, and an SDK sketch labelled as planned |
+| Pricing | A three-column "plan shapes" ledger asking the same six questions of each plan, all answered "Not decided" | None, deliberately: no prices, no offer. Sizing versus safety, then an FAQ |
+| About | An editorial statement, four principles, a roadmap ledger | None. "No borrowed credibility" is stated plainly |
+| Contact | Reach-us list beside the form, a rule between them rather than a box | The validated form that never claims to send |
+| Privacy, Terms | The same hero and chapter language, a sticky contents rail, inline review flags | None |
+
+Every page now follows the same system: a restrained hero with one status strip, numbered chapters with the index in the margin, status words instead of pills, and an ending that is specific to the page (a row of links, a ledger, a disclosure) rather than a shared call-to-action band.
+
+**Removed (no longer used):** `PageHero`, `FeatureRow`, `Window`, `PageCta`, `SectionHeading`, `StatusPill`, `Callout`, `TrustBoundary`, `AuthorizationFlow`, `PolicyPrecedence`, `RevocationTimeline`, `N8nWorkflow`, `ExecutorChecks`, `StatusLifecycle`, `ClientLanes`, `SdkSketch`, `AgentsPanel`. The homepage's own panels (`feature-panels`, `integration-flow`, `code-tabs`) are untouched.
+
+## 6. Still true
+
+The honesty rules, the claims guard test, accessibility, reduced-motion behaviour, the six-page navigation, every route, and the FE-07 dashboard and homepage are unchanged. Open launch items remain in `docs/FE-08-LAUNCH-BLOCKERS.md`.
