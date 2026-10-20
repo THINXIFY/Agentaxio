@@ -1,0 +1,57 @@
+/* Brand utilities that Tailwind cannot express from tokens alone. */
+
+@utility text-gradient {
+  background-image: var(--gradient-text);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
+@utility bg-brand-gradient {
+  background-image: var(--gradient-brand);
+}
+
+@utility bg-wash {
+  background-image: var(--gradient-wash);
+}
+
+/* Subtle engineered grid for cinematic sections. Decorative only. */
+@utility bg-grid {
+  background-image:
+    linear-gradient(
+      to right,
+      color-mix(in srgb, var(--foreground) 6%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--foreground) 6%, transparent) 1px,
+      transparent 1px
+    );
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 30%, black 30%, transparent 75%);
+}
+
+/* Outlined display lettering for large decorative numerals / wordmarks (aria-hidden use only). */
+@utility text-outline {
+  color: transparent;
+  -webkit-text-stroke: 1px color-mix(in srgb, var(--foreground) 26%, transparent);
+}
+
+/* Decorative lettering drawn from data-text via ::before, so it is not DOM text (no a11y noise, not selectable). */
+@utility deco-text {
+  &::before {
+    content: attr(data-text);
+  }
+}
+
+/* Registration / crosshair mark: a quiet technical detail for the hero corners. Decorative. */
+@utility reg-mark {
+  width: 13px;
+  height: 13px;
+  color: var(--border-strong);
+  background:
+    linear-gradient(currentColor, currentColor) center / 1px 100% no-repeat,
+    linear-gradient(currentColor, currentColor) center / 100% 1px no-repeat;
+}

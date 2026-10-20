@@ -1,0 +1,96 @@
+@import "tailwindcss";
+
+/*
+ * Tailwind v4 theme: maps the semantic tokens in tokens.css to utilities.
+ * `inline` makes utilities reference the CSS variables directly, so theme switches
+ * and .surface-* scopes re-colour components with no `dark:` variants.
+ *
+ * The default Tailwind palette is removed on purpose: components may only use semantic roles
+ * (bg-surface, text-muted-foreground, border-border …). Add a role in tokens.css first.
+ */
+
+/* `dark:` is available for rare cases; prefer semantic tokens. */
+@custom-variant dark (&:where(.dark, .dark *, .surface-dark, .surface-dark *));
+
+@theme inline {
+  --color-*: initial;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-surface-hover: var(--surface-hover);
+  --color-shell: var(--shell);
+  --color-workspace: var(--workspace);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-input-border: var(--input-border);
+  --color-ring: var(--ring);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-text: var(--primary-text);
+  --color-mark: var(--mark);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent-text: var(--accent-text);
+  --color-subtle: var(--subtle);
+  --color-subtle-foreground: var(--subtle-foreground);
+  --color-success: var(--success);
+  --color-success-text: var(--success-text);
+  --color-success-muted: var(--success-muted);
+  --color-success-border: var(--success-border);
+  --color-warning: var(--warning);
+  --color-warning-text: var(--warning-text);
+  --color-warning-muted: var(--warning-muted);
+  --color-warning-border: var(--warning-border);
+  --color-danger: var(--danger);
+  --color-danger-text: var(--danger-text);
+  --color-danger-muted: var(--danger-muted);
+  --color-danger-border: var(--danger-border);
+  --color-info: var(--info);
+  --color-info-text: var(--info-text);
+  --color-info-muted: var(--info-muted);
+  --color-info-border: var(--info-border);
+  --color-overlay: var(--overlay);
+
+  --font-sans:
+    var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display:
+    var(--font-space-grotesk), var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --radius-control: var(--r-control);
+  --radius-card: var(--r-card);
+  --radius-panel: var(--r-panel);
+
+  --shadow-raised: var(--elev-1);
+  --shadow-floating: var(--elev-2);
+  --shadow-hero: var(--elev-3);
+  --shadow-glow: var(--glow);
+
+  --ease-standard: var(--motion-ease-standard);
+  --ease-emphasized: var(--motion-ease-emphasized);
+
+  /* Display scale (Space Grotesk). Fluid, clamped; use via <Heading> or text-display-*. */
+  --text-display-hero: clamp(2.125rem, 1rem + 4.4vw, 4.75rem);
+  --text-display-hero--line-height: 1.02;
+  --text-display-hero--letter-spacing: -0.04em;
+  --text-display-2xl: clamp(3.25rem, 1.5rem + 7.6vw, 8.25rem);
+  --text-display-2xl--line-height: 0.95;
+  --text-display-2xl--letter-spacing: -0.045em;
+  --text-display-xl: clamp(3rem, 1.9rem + 4.6vw, 5.75rem);
+  --text-display-xl--line-height: 1.02;
+  --text-display-xl--letter-spacing: -0.035em;
+  --text-display-lg: clamp(2.5rem, 1.8rem + 3vw, 4.25rem);
+  --text-display-lg--line-height: 1.05;
+  --text-display-lg--letter-spacing: -0.03em;
+  --text-display-md: clamp(2rem, 1.5rem + 2vw, 3rem);
+  --text-display-md--line-height: 1.1;
+  --text-display-md--letter-spacing: -0.025em;
+  --text-display-sm: clamp(1.5rem, 1.25rem + 1vw, 2rem);
+  --text-display-sm--line-height: 1.15;
+  --text-display-sm--letter-spacing: -0.02em;
+}

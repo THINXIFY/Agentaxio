@@ -1,0 +1,8 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+
+# Dependency install scripts are denied by default (supply-chain hygiene).
+# unrs-resolver ships prebuilt binaries as optional dependencies; its postinstall is only a fallback.
+allowBuilds:
+  unrs-resolver: false

@@ -1,0 +1,69 @@
+# ── dependencies ───────────────────────────────────────────────────────────
+node_modules/
+.pnpm-store/
+.pnp
+.pnp.*
+.yarn/
+
+# ── build output and generated files ───────────────────────────────────────
+.next/
+out/
+dist/
+build/
+coverage/
+.turbo/
+.vercel/
+.cache/
+*.tsbuildinfo
+next-env.d.ts
+
+# ── tests and tooling caches ───────────────────────────────────────────────
+.vite/
+.vitest/
+.eslintcache
+playwright-report/
+test-results/
+blob-report/
+
+# ── environment files: never commit real values; only *.example files are tracked ──
+.env
+.env.*
+!.env.example
+*.local
+
+# ── credentials and keys (defence in depth: none of these belong in the repo) ──
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+id_rsa*
+id_ed25519*
+credentials*.json
+service-account*.json
+secrets.*
+.npmrc
+.netrc
+.aws/
+.gcloud/
+
+# ── logs ───────────────────────────────────────────────────────────────────
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ── OS and editors ─────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+Desktop.ini
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+
+# ── Claude Code local state ────────────────────────────────────────────────
+.claude/settings.local.json
+.claude/projects/

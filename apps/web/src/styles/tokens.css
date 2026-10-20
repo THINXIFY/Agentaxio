@@ -1,0 +1,294 @@
+/*
+ * AgentAxio design tokens — Obsidian Black × Midnight Violet
+ * ---------------------------------------------------------------------------
+ * Single source of truth for colour, elevation, radius, motion and layout. To re-brand, change this file
+ * (and nothing else): components only ever use the semantic roles below.
+ *
+ *   Layer 1  --ax-*      Primitive palette. Raw values only. Never used in components.
+ *   Layer 2  --<role>    Semantic roles (background, primary, border …). Components use ONLY these,
+ *                        via Tailwind utilities generated in theme.css (bg-background, text-primary-text …).
+ *
+ * Theme switching:
+ *   :root / .surface-light   light palette (default)
+ *   .dark / .surface-dark    dark palette; `.dark` is set on <html> by next-themes (Light/Dark/System)
+ *   .surface-* classes force a palette on a subtree regardless of the user’s theme. The marketing
+ *   site uses them to mix cinematic dark sections with arctic-white editorial ones.
+ *
+ * Palette: Obsidian Black #06050C, Midnight Navy #101024, Deep Indigo #252044, Electric Violet #7864F6,
+ * Soft Lavender #B9ACFF, Arctic White #F5F4FA.
+ *
+ * Violet rules (WCAG-driven):
+ *   - #7864F6 is a FILL. It carries obsidian text (#06050C, 4.8:1); white on it would be 4.25:1, below AA.
+ *   - Violet as TEXT / ICON / LINK is soft lavender (#B9ACFF) on dark and deep violet (#4B38C9) on light.
+ *   - Violet is never the only signal for a security state: statuses use dedicated success / warning /
+ *     danger / info roles (info is a cyan-blue so it cannot be mistaken for the brand violet) plus text and icons.
+ *   - Keep it restrained: violet marks the primary action, the active item and precise details. Avoid large
+ *     glowing fields, colourful cards and gradients.
+ *   - Dark layers: shell #06050C < workspace #101024 < surface #171631 < surface-hover #1F1D40; border #252044.
+ *
+ * Semantic colour values are plain hex on purpose: src/styles/tokens.contrast.test.ts parses this file
+ * and fails the build if a foreground/background pair drops below WCAG 2.2 AA. A second test fails if a
+ * component hardcodes a hex colour instead of using these roles.
+ */
+
+:root {
+  /* ── Layer 1: primitives ─────────────────────────────────────────────── */
+
+  /* Midnight Violet — the single accent */
+  --ax-violet-300: #d9d3ff;
+  --ax-violet-400: #b9acff; /* soft lavender */
+  --ax-violet-500: #8c7af8;
+  --ax-violet-600: #7864f6; /* electric violet */
+  --ax-violet-700: #6a55ee;
+  --ax-violet-800: #4b38c9;
+  --ax-violet-900: #2f2478;
+
+  /* Obsidian / midnight / indigo — dark neutrals */
+  --ax-obsidian-950: #06050c; /* obsidian black */
+  --ax-obsidian-900: #0b0a18;
+  --ax-navy-900: #101024; /* midnight navy: dashboard workspace */
+  --ax-navy-800: #171631; /* card surface */
+  --ax-navy-700: #1f1d40; /* hover surface */
+  --ax-indigo-800: #252044; /* deep indigo: hairline border */
+  --ax-indigo-600: #3a3468;
+  --ax-mist-400: #a9a6c4; /* muted text on dark */
+
+  /* Arctic white / light neutrals */
+  --ax-white: #ffffff;
+  --ax-arctic-100: #f5f4fa; /* arctic white */
+  --ax-arctic-200: #e9e7f4;
+  --ax-arctic-300: #dcd8ee; /* light border */
+  --ax-arctic-400: #bfb9de;
+  --ax-arctic-500: #77739c;
+  --ax-arctic-600: #55537a;
+  --ax-ink-900: #12112a; /* deep ink */
+
+  /* ── Non-colour tokens (theme-independent) ───────────────────────────── */
+
+  --r-control: 0.5rem; /* buttons, inputs */
+  --r-card: 0.875rem; /* panels, windows */
+  --r-panel: 1.25rem; /* section sheets */
+
+  --motion-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --motion-ease-emphasized: cubic-bezier(0.16, 1, 0.3, 1);
+  --motion-fast: 120ms;
+  --motion-base: 200ms;
+  --motion-slow: 600ms;
+
+  --container-max: 76rem; /* marketing content width */
+  --container-narrow: 48rem;
+  --sidebar-width: 16rem;
+
+  --topbar-height: 3.5rem;
+
+  --z-sticky: 20;
+  --z-overlay: 40;
+  --z-dialog: 50;
+  --z-toast: 60;
+}
+
+/* ── Layer 2: semantic roles — LIGHT ─────────────────────────────────────── */
+:root,
+.surface-light {
+  color-scheme: light;
+
+  --background: #f5f4fa;
+  --foreground: #12112a;
+  --muted-foreground: #55537a;
+
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --surface-sunken: #e9e7f4;
+
+  --shell: #eeecf7;
+  --workspace: #f5f4fa;
+  --surface-hover: #f1effa;
+
+  --border: #dcd8ee;
+  --border-strong: #bfb9de;
+  --input-border: #77739c;
+  --ring: #5b47e0;
+
+  --primary: #7864f6;
+  --primary-hover: #8c7af8;
+  --primary-foreground: #06050c;
+  --primary-text: #4b38c9;
+
+  --accent: #7864f6;
+  --accent-foreground: #06050c;
+  --accent-text: #4b38c9;
+
+  --mark: #6a55ee;
+
+  --subtle: #e8e4ff;
+  --subtle-foreground: #2f2478;
+
+  --success: #0e8a6b;
+  --success-text: #0a6b53;
+  --success-muted: #dcf4ec;
+  --success-border: #9adcc6;
+
+  --warning: #b36d00;
+  --warning-text: #7d4b00;
+  --warning-muted: #fff3d6;
+  --warning-border: #ecc977;
+
+  --danger: #d1342b;
+  --danger-text: #a8231b;
+  --danger-muted: #fde7e6;
+  --danger-border: #f2b3af;
+
+  --info: #0f7fa6;
+  --info-text: #0b6585;
+  --info-muted: #dff3fa;
+  --info-border: #9fd3e6;
+
+  --overlay: rgb(18 17 42 / 0.5);
+
+  --elev-1: 0 1px 2px rgb(18 17 42 / 0.06), 0 1px 1px rgb(18 17 42 / 0.04);
+  --elev-2: 0 2px 4px rgb(18 17 42 / 0.05), 0 12px 28px -12px rgb(18 17 42 / 0.16);
+  --elev-3: 0 4px 8px rgb(18 17 42 / 0.06), 0 28px 60px -20px rgb(18 17 42 / 0.28);
+  --glow: 0 0 0 1px rgb(91 71 224 / 0.25), 0 10px 40px -12px rgb(120 100 246 / 0.4);
+
+  --gradient-brand: linear-gradient(120deg, #7864f6 0%, #b9acff 100%);
+  --gradient-text: linear-gradient(110deg, #4b38c9 0%, #6a55ee 100%);
+  --gradient-wash: radial-gradient(60% 70% at 50% 0%, rgb(120 100 246 / 0.16), transparent 70%);
+}
+
+/* ── Layer 2: semantic roles — DARK ──────────────────────────────────────── */
+.dark,
+.surface-dark {
+  color-scheme: dark;
+
+  --background: #06050c;
+  --foreground: #f5f4fa;
+  --muted-foreground: #a9a6c4;
+
+  --surface: #171631;
+  --surface-raised: #1d1b3b;
+  --surface-sunken: #0b0a18;
+
+  --shell: #06050c;
+  --workspace: #101024;
+  --surface-hover: #1f1d40;
+
+  --border: #252044;
+  --border-strong: #3a3468;
+  --input-border: #7b78a0;
+  --ring: #b9acff;
+
+  --primary: #7864f6;
+  --primary-hover: #8c7af8;
+  --primary-foreground: #06050c;
+  --primary-text: #b9acff;
+
+  --accent: #7864f6;
+  --accent-foreground: #06050c;
+  --accent-text: #b9acff;
+
+  --mark: #8c7af8;
+
+  --subtle: #252044;
+  --subtle-foreground: #d9d3ff;
+
+  --success: #3fd0a4;
+  --success-text: #6de0be;
+  --success-muted: #0c2b22;
+  --success-border: #1c5a47;
+
+  --warning: #eaa93b;
+  --warning-text: #f4c066;
+  --warning-muted: #2c2109;
+  --warning-border: #6b4d12;
+
+  --danger: #ff6b61;
+  --danger-text: #ff8f87;
+  --danger-muted: #2e1315;
+  --danger-border: #6d2a2c;
+
+  --info: #4cc2e8;
+  --info-text: #7fd3f0;
+  --info-muted: #0b2634;
+  --info-border: #1b5a75;
+
+  --overlay: rgb(3 2 8 / 0.74);
+
+  --elev-1: 0 1px 2px rgb(0 0 0 / 0.5), inset 0 1px 0 rgb(245 244 250 / 0.04);
+  --elev-2: 0 2px 4px rgb(0 0 0 / 0.4), 0 16px 32px -12px rgb(0 0 0 / 0.7);
+  --elev-3: 0 4px 8px rgb(0 0 0 / 0.5), 0 32px 64px -20px rgb(0 0 0 / 0.8);
+  --glow: 0 0 0 1px rgb(120 100 246 / 0.3), 0 10px 48px -12px rgb(120 100 246 / 0.32);
+
+  --gradient-brand: linear-gradient(120deg, #7864f6 0%, #b9acff 100%);
+  --gradient-text: linear-gradient(110deg, #b9acff 0%, #f5f4fa 100%);
+  --gradient-wash: radial-gradient(60% 70% at 50% 0%, rgb(120 100 246 / 0.16), transparent 70%);
+}
+
+/*
+ * A forced surface paints itself so nested content inherits the right colours.
+ * In @layer base on purpose: unlayered CSS would beat Tailwind utilities, making
+ * `surface-light bg-subtle` or `surface-dark bg-transparent` impossible.
+ */
+@layer base {
+  .surface-light,
+  .surface-dark {
+    background-color: var(--background);
+    color: var(--foreground);
+  }
+}
+
+/*
+ * ── Dashboard surfaces ──────────────────────────────────────────────────────
+ * The application UI sits on calmer, more neutral surfaces than the marketing site. Everything below is scoped to
+ * `.dashboard-scope` (set once on the dashboard root), so the marketing pages keep the palette defined above.
+ * Only the surface, border and text-tone roles change; violet stays an accent (active item, links, focus, charts).
+ *
+ *   DARK   shell #06050C (sidebar, darkest) < workspace #111116 (neutral) < surface #18181E < hover #202028
+ *   LIGHT  sidebar stays dark #06050C; workspace #F4F4F7 (soft off-white, never pure white) < surface #FCFCFD; border #E3E3EA
+ *
+ * In light mode the sidebar and drawer are forced dark with `.surface-dark`, so they look identical in both themes.
+ * Portals (menus, popovers, the drawer) render inside the scope root, so they inherit these roles too.
+ */
+.dashboard-scope {
+  --background: #f4f4f7;
+  --foreground: #14141c;
+  --muted-foreground: #5b5b6e;
+
+  --surface: #fcfcfd;
+  --surface-raised: #ffffff;
+  --surface-sunken: #ebebf0;
+
+  --shell: #06050c;
+  --workspace: #f4f4f7;
+  --surface-hover: #f1f1f5;
+
+  --border: #e3e3ea;
+  --border-strong: #c9c9d6;
+  --input-border: #767689;
+
+  --elev-1: 0 1px 2px rgb(20 20 28 / 0.05), 0 1px 1px rgb(20 20 28 / 0.03);
+  --elev-2: 0 2px 4px rgb(20 20 28 / 0.05), 0 12px 28px -12px rgb(20 20 28 / 0.14);
+  --overlay: rgb(20 20 28 / 0.45);
+}
+
+.dark .dashboard-scope,
+.dashboard-scope .surface-dark {
+  --background: #111116;
+  --foreground: #f5f4fa;
+  --muted-foreground: #a4a3b4;
+
+  --surface: #18181e;
+  --surface-raised: #1e1e26;
+  --surface-sunken: #0d0d11;
+
+  --shell: #06050c;
+  --workspace: #111116;
+  --surface-hover: #202028;
+
+  --border: #26262f;
+  --border-strong: #383844;
+  --input-border: #7c7b90;
+
+  --elev-1: 0 1px 2px rgb(0 0 0 / 0.4), inset 0 1px 0 rgb(245 244 250 / 0.03);
+  --elev-2: 0 2px 4px rgb(0 0 0 / 0.4), 0 16px 32px -12px rgb(0 0 0 / 0.7);
+  --overlay: rgb(3 2 8 / 0.7);
+}

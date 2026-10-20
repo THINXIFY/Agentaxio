@@ -1,0 +1,158 @@
+/*
+ * GSAP progressive-enhancement hooks.
+ *
+ * `html.motion-ok` is added by the inline bootstrap in app/layout.tsx ONLY when JS runs AND the user
+ * has not requested reduced motion. Elements marked [data-reveal] start hidden under that class and
+ * are revealed by components/motion/reveal.tsx. Without JS, or with reduced motion, content is simply
+ * visible — animation is never required to read or use the page.
+ */
+/* Overlay / drawer transitions (CSS only; collapsed to ~0ms by the global reduced-motion rule in base.css). */
+@keyframes ax-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes ax-slide-in-left {
+  from {
+    transform: translateX(-100%);
+  }
+}
+
+@keyframes ax-slide-in-right {
+  from {
+    transform: translateX(100%);
+  }
+}
+
+.ax-fade-in {
+  animation: ax-fade-in var(--motion-base) var(--motion-ease-standard);
+}
+
+.ax-drawer[data-side="left"] {
+  animation: ax-slide-in-left 280ms var(--motion-ease-emphasized);
+}
+
+.ax-drawer[data-side="right"] {
+  animation: ax-slide-in-right 280ms var(--motion-ease-emphasized);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html.motion-ok [data-scroll-line] {
+    transform: scaleX(0);
+    transform-origin: left center;
+  }
+
+  html.motion-ok [data-reveal]:not([data-revealed]),
+  html.motion-ok [data-reveal-item]:not([data-revealed]) {
+    opacity: 0;
+    transform: translate3d(0, 24px, 0);
+  }
+}
+
+/* A dot travelling down an integration connector (decorative). Collapsed by the reduced-motion rule in base.css. */
+@keyframes ax-flow {
+  from {
+    transform: translate(-50%, -0.25rem);
+    opacity: 0;
+  }
+  15%,
+  85% {
+    opacity: 1;
+  }
+  to {
+    transform: translate(-50%, 2.25rem);
+    opacity: 0;
+  }
+}
+
+.ax-flow {
+  top: 0;
+  left: 50%;
+  animation: ax-flow 2.2s var(--motion-ease-standard) infinite;
+}
+
+/*
+ * Hero entrance — pure CSS, so the headline never waits for JavaScript (LCP). Elements animate in from
+ * slightly below with a staggered delay (--d). Reduced motion collapses duration AND delay to the end state (base.css).
+ */
+@keyframes ax-rise {
+  from {
+    opacity: 0;
+    transform: translate3d(0, var(--rise, 18px), 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.hero-rise {
+  animation: ax-rise 850ms var(--motion-ease-emphasized) var(--d, 0ms) both;
+}
+
+/*
+ * Dashboard micro-interactions: short, predictable, never decorative. Reduced motion collapses all of them
+ * (duration and delay) to the end state in base.css.
+ */
+@keyframes ax-pop {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -4px, 0) scale(0.98);
+  }
+}
+
+.ax-pop {
+  animation: ax-pop 150ms var(--motion-ease-standard);
+  transform-origin: var(--radix-popper-transform-origin, 50% 0);
+}
+
+@keyframes ax-tab-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 4px, 0);
+  }
+}
+
+.ax-tab-in {
+  animation: ax-tab-in 220ms var(--motion-ease-standard);
+}
+
+@keyframes ax-page-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0);
+  }
+}
+
+/* Applied by app/dashboard/template.tsx, which re-mounts on every navigation. */
+.page-enter {
+  animation: ax-page-in 320ms var(--motion-ease-emphasized) both;
+}
+
+/* Hero artwork: dots drifting along elliptical orbits (offset-path is set inline per dot) and a slowly breathing checkpoint. Both rest under the global reduced-motion rule in base.css. Decorative. */
+@keyframes ax-orbit {
+  to {
+    offset-distance: 100%;
+  }
+}
+
+.orbit-dot {
+  offset-rotate: 0deg;
+  animation: ax-orbit var(--orbit-duration, 40s) linear infinite;
+  animation-delay: var(--orbit-delay, 0s);
+}
+
+@keyframes ax-breathe {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.orbit-breathe {
+  animation: ax-breathe 6s ease-in-out infinite;
+}
