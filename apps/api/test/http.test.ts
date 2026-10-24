@@ -75,6 +75,13 @@ describe("route table", () => {
   });
 });
 
+describe("transport limits", () => {
+  it("bounds how long a client can hold a request or connection open", () => {
+    expect(app.server.requestTimeout).toBe(15_000);
+    expect(app.server.timeout).toBe(30_000);
+  });
+});
+
 describe("S01 no anonymous execution", () => {
   it("answers every authentication failure the same way and writes nothing", async () => {
     const agent = await w.newAgent(w.orgA, w.orgA.dev);

@@ -583,6 +583,35 @@ describe("S02 row-level security isolates tenants", () => {
     });
   });
 
+  it("leaks no tenant context to the next user of a pooled connection", async () => {
+    const agent = await w.newAgent(w.orgA, w.orgA.dev);
+    await w.policy(w.orgA, { effect: "allow", agentId: agent.agentId });
+    // One physical connection, reused: the second transaction must start with no tenant at all.
+    const single = new pg.Pool({ connectionString: w.db.urls.agentApi, max: 1 });
+    try {
+      const { inTransaction } = await import("../src/db/pool");
+      await inTransaction(single, async (tx) => {
+        await tx.query("SELECT * FROM axo.enter_agent_context($1::uuid, true)", [
+          agent.credentialId,
+        ]);
+        const inside = await tx.query(
+          "SELECT axo.current_org() AS org, axo.current_agent() AS agent",
+        );
+        expect(inside.rows[0].org).toBe(w.orgA.id);
+      });
+      await inTransaction(single, async (tx) => {
+        const after = await tx.query(
+          "SELECT axo.current_org() AS org, axo.current_agent() AS agent, axo.current_env() AS env, axo.current_user_id() AS usr",
+        );
+        expect(after.rows[0]).toEqual({ org: null, agent: null, env: null, usr: null });
+        const seen = await tx.query("SELECT count(*)::int AS n FROM axo.action_requests");
+        expect(seen.rows[0].n).toBe(0);
+      });
+    } finally {
+      await single.end();
+    }
+  });
+
   it("KNOWN LIMITATION: a compromised agent-api process could choose its own tenant context", async () => {
     // Row-level security reads transaction settings. The service sets them only through axo.enter_agent_context,
     // but a role cannot be stopped from calling set_config itself. RLS therefore protects against application BUGS

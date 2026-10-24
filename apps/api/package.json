@@ -13,7 +13,11 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "db:setup": "tsx --env-file=../../.env src/cli/setup.ts",
+    "db:migrate": "tsx --env-file=.env src/cli/migrate.ts",
+    "db:seed": "tsx --env-file=.env src/cli/seed.ts",
+    "dev": "tsx --env-file=.env src/cli/dev.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

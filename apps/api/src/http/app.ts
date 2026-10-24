@@ -92,6 +92,9 @@ export function buildApp(deps: AppDeps): FastifyInstance {
             },
           },
     bodyLimit: LIMITS.bodyBytes,
+    // Bound how long a client may hold a connection or a half-sent request open.
+    requestTimeout: 15_000,
+    connectionTimeout: 30_000,
     genReqId: () => randomUUID(),
     exposeHeadRoutes: false,
     trustProxy: false,

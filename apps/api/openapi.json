@@ -1,0 +1,215 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "AgentAxio agent API (M01, local only)",
+    "version": "0.1.0",
+    "description": "Authorization requests from integrated AI agents. M01 decides and records; it does not execute. 'queued_execution' means authorized and waiting for the trusted executor that arrives in M02. Nothing here is deployed, and this is not a statement that any production system is protected."
+  },
+  "servers": [{ "url": "http://127.0.0.1:8787", "description": "Local development only" }],
+  "security": [{ "agentKey": [] }],
+  "paths": {
+    "/v1/action-requests": {
+      "post": {
+        "operationId": "createActionRequest",
+        "summary": "Propose an action",
+        "description": "The tenant, agent and environment are derived from the credential. The body carries only the action, the resource and its parameters; any other field is rejected.",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "16 to 128 characters of [A-Za-z0-9._:-]. The same key with the same payload returns the original answer; with a different payload it is a conflict.",
+            "schema": {
+              "type": "string",
+              "minLength": 16,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/ActionRequestBody" } }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Held for approval, or authorized and queued.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ActionRequestStatus" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthenticated" },
+          "403": {
+            "description": "Denied by policy (a decision body), or the agent is suspended (an error body).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    { "$ref": "#/components/schemas/ActionRequestStatus" },
+                    { "$ref": "#/components/schemas/Error" }
+                  ]
+                }
+              }
+            }
+          },
+          "409": { "$ref": "#/components/responses/Error" },
+          "413": { "$ref": "#/components/responses/Error" },
+          "415": { "$ref": "#/components/responses/Error" },
+          "422": { "$ref": "#/components/responses/Error" },
+          "429": { "$ref": "#/components/responses/Error" },
+          "503": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/v1/action-requests/{id}": {
+      "get": {
+        "operationId": "getActionRequest",
+        "summary": "Status of one of the calling agent's own requests",
+        "description": "A request that belongs to another agent or organization, does not exist, or has a malformed id is indistinguishable: all return 404.",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request's current status.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ActionRequestStatus" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthenticated" },
+          "403": { "$ref": "#/components/responses/Error" },
+          "404": { "$ref": "#/components/responses/Error" },
+          "503": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "agentKey": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "axo_<24 hex>_<43 base64url>. Issued once when created; never retrievable."
+      }
+    },
+    "responses": {
+      "Unauthenticated": {
+        "description": "Missing, malformed, unknown, wrong, expired or revoked credential. All of these are indistinguishable.",
+        "headers": { "WWW-Authenticate": { "schema": { "type": "string" } } },
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "Error": {
+        "description": "Error.",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      }
+    },
+    "schemas": {
+      "ActionRequestBody": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["action", "resource", "parameters"],
+        "properties": {
+          "action": {
+            "type": "string",
+            "const": "crm.lead.create",
+            "description": "Other well-formed action keys are recorded as a denial (UNKNOWN_ACTION)."
+          },
+          "resource": { "type": "string", "const": "mockcrm/leads" },
+          "parameters": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["full_name", "email", "company"],
+            "properties": {
+              "full_name": { "type": "string", "minLength": 1, "maxLength": 120 },
+              "email": {
+                "type": "string",
+                "maxLength": 254,
+                "description": "ASCII only; lowercased before use."
+              },
+              "company": { "type": "string", "minLength": 1, "maxLength": 120 }
+            }
+          }
+        }
+      },
+      "ActionRequestStatus": {
+        "type": "object",
+        "required": ["id", "status"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "status": {
+            "type": "string",
+            "enum": [
+              "denied",
+              "pending_approval",
+              "approved",
+              "queued_execution",
+              "running",
+              "succeeded",
+              "failed",
+              "expired",
+              "unknown"
+            ]
+          },
+          "reason_code": {
+            "type": "string",
+            "enum": [
+              "POLICY_DENY",
+              "UNKNOWN_ACTION",
+              "HUMAN_REVIEW_REQUIRED",
+              "APPROVAL_DENIED",
+              "APPROVAL_EXPIRED",
+              "AGENT_SUSPENDED",
+              "CREDENTIAL_REVOKED",
+              "ENVIRONMENT_HALTED",
+              "POLICY_CHANGED",
+              "EVALUATOR_ERROR",
+              "EXECUTION_FAILED",
+              "OUTCOME_UNKNOWN"
+            ]
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": ["error"],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": ["code", "message", "trace_id"],
+            "properties": {
+              "code": {
+                "type": "string",
+                "enum": [
+                  "UNAUTHENTICATED",
+                  "FORBIDDEN",
+                  "AGENT_SUSPENDED",
+                  "NOT_FOUND",
+                  "IDEMPOTENCY_CONFLICT",
+                  "PAYLOAD_TOO_LARGE",
+                  "UNSUPPORTED_MEDIA_TYPE",
+                  "INVALID_REQUEST",
+                  "RATE_LIMITED",
+                  "SERVICE_UNAVAILABLE"
+                ]
+              },
+              "message": { "type": "string" },
+              "trace_id": { "type": "string" },
+              "issues": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Field paths and error kinds only; never submitted values."
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
