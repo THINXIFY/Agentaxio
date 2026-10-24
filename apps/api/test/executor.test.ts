@@ -310,6 +310,26 @@ describe("S11 everything is re-checked at the moment of execution", () => {
     expect(await eventTypes(requestId)).not.toContain("grant.claimed");
   });
 
+  it("re-evaluates the rules for THIS request: an unrelated rule change does not stop it, a relevant one does", async () => {
+    await drain();
+    const org = await w.freshOrg();
+    const unaffected = await queued(org, "allow");
+    const affected = await queued(org, "allow");
+    const other = await w.newAgent(org, org.dev);
+    await w.policy(org, { effect: "deny", agentId: other.agentId }); // concerns a different agent
+    await w.policy(org, { effect: "deny", agentId: affected.agent.agentId });
+    const results = await drain();
+    const byId = new Map(results.map((r) => [r.requestId, r]));
+    expect(byId.get(unaffected.requestId)).toMatchObject({
+      kind: "executed",
+      outcome: "succeeded",
+    });
+    expect(byId.get(affected.requestId)).toMatchObject({
+      kind: "blocked",
+      reasonCode: "POLICY_CHANGED",
+    });
+  });
+
   it("withdraws a queued request when the agent is suspended, its key revoked, or its environment halted", async () => {
     await drain();
     const org = await w.freshOrg();

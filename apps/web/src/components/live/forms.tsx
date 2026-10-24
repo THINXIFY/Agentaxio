@@ -534,3 +534,124 @@ export function EnvironmentSwitch({
     </div>
   );
 }
+
+/* ---------------------------------------------------------------------------------------------------------------- */
+/* People                                                                                                           */
+/* ---------------------------------------------------------------------------------------------------------------- */
+
+const ROLE_OPTIONS = [
+  { value: "approver", label: "Approver · can decide requests" },
+  { value: "viewer", label: "Viewer · read only" },
+  { value: "admin", label: "Admin · manages agents and rules" },
+  { value: "owner", label: "Owner · full control" },
+] as const;
+
+/**
+ * Invite a colleague. There is no outbound email in this pre-release, so the invitation code is shown once, here, and the
+ * inviter sends it themselves. It only works for someone signed in with that exact verified email address.
+ */
+export function InviteForm({ orgBase }: { orgBase: string }) {
+  const { run, pending, failure } = useApiAction();
+  const [email, setEmail] = React.useState("");
+  const [role, setRole] = React.useState<(typeof ROLE_OPTIONS)[number]["value"]>("approver");
+  const [token, setToken] = React.useState<string | null>(null);
+
+  return (
+    <div className="space-y-5">
+      <form
+        className="space-y-5"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void run<{ token: string }>(`${orgBase}/invitations`, { email: email.trim(), role }).then(
+            (r) => {
+              if (r.ok) {
+                setToken(r.data.token);
+                setEmail("");
+              }
+            },
+          );
+        }}
+      >
+        <Field
+          label="Their email address"
+          hint="Must match the verified email they sign in with."
+          required
+        >
+          <Input
+            type="email"
+            value={email}
+            maxLength={254}
+            onChange={(e) => {
+              setEmail(e.target.value);
+            }}
+          />
+        </Field>
+        <Field label="Role" required>
+          <Select
+            value={role}
+            onChange={(e) => {
+              setRole(e.target.value as typeof role);
+            }}
+          >
+            {ROLE_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <p className="text-sm text-muted-foreground">
+          Admins can invite approvers and viewers; only owners can invite admins and owners.
+        </p>
+        <ActionError failure={failure} />
+        <Button type="submit" loading={pending} disabled={email.trim() === ""}>
+          Create invitation
+        </Button>
+      </form>
+      {token !== null ? (
+        <div
+          role="status"
+          className="rounded-control border border-warning-border bg-warning-muted p-4"
+        >
+          <p className="text-base font-medium">Send them this code: it is shown only once.</p>
+          <code className="mt-2 block rounded-control bg-surface-sunken px-3 py-2 font-mono text-sm break-all">
+            {token}
+          </code>
+          <p className="mt-2 text-sm text-muted-foreground">
+            It expires in 7 days. They paste it under “Join an organization” after signing in.
+          </p>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** Join an organization with an invitation code. The server checks the code and that the signed-in email matches. */
+export function AcceptInvitationForm() {
+  const { run, pending, failure } = useApiAction();
+  const [code, setCode] = React.useState("");
+  return (
+    <form
+      className="space-y-4"
+      onSubmit={(event) => {
+        event.preventDefault();
+        void run("/v1/invitations/accept", { token: code.trim() });
+      }}
+    >
+      <Field label="Invitation code" required>
+        <Input
+          value={code}
+          maxLength={64}
+          autoComplete="off"
+          onChange={(e) => {
+            setCode(e.target.value);
+          }}
+        />
+      </Field>
+      <ActionError failure={failure} />
+      <Button type="submit" loading={pending} disabled={code.trim().length < 20}>
+        Join
+      </Button>
+    </form>
+  );
+}

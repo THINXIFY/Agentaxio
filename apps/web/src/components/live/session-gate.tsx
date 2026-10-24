@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Building2, CloudOff, LogIn } from "lucide-react";
+import { AcceptInvitationForm } from "@/components/live/forms";
 import { ActionError, useApiAction } from "@/components/live/use-api-action";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/field";
@@ -89,6 +90,10 @@ export function CreateOrganizationPanel() {
           Create organization
         </Button>
       </form>
+      <div className="mt-8 border-t border-border/60 pt-6">
+        <h3 className="mb-3 text-lg font-semibold">Join an organization</h3>
+        <AcceptInvitationForm />
+      </div>
     </div>
   );
 }

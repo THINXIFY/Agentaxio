@@ -3,7 +3,12 @@ import userEvent from "@testing-library/user-event";
 import * as React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PendingApprovalCard } from "@/components/live/approval-card";
-import { CredentialsPanel, CreatePolicyForm } from "@/components/live/forms";
+import {
+  AcceptInvitationForm,
+  CredentialsPanel,
+  CreatePolicyForm,
+  InviteForm,
+} from "@/components/live/forms";
 import { LiveAgentList, LiveRequestItem } from "@/components/live/records";
 import { SignedOutPanel } from "@/components/live/session-gate";
 import { AccountMenu } from "@/components/layout/dashboard-menus";
@@ -406,5 +411,41 @@ describe("records and shell in live mode", () => {
       "/api/auth/login?return_to=/dashboard",
     );
     expect(container.textContent).toMatch(/never sees your password/);
+  });
+});
+
+describe("people", () => {
+  it("shows an invitation code once and sends the invite with the chosen role", async () => {
+    const code = "A".repeat(43);
+    fetchMock.mockReturnValue(
+      reply(200, { invitationId: "i", token: code, expiresInSeconds: 604800 }),
+    );
+    const user = userEvent.setup();
+    const setItem = vi.spyOn(Storage.prototype, "setItem");
+    render(wrap(<InviteForm orgBase="/v1/orgs/o1" />));
+    await user.type(screen.getByLabelText(/Their email address/), "grace@example.test");
+    await user.selectOptions(screen.getByLabelText(/^Role/), "viewer");
+    await user.click(screen.getByRole("button", { name: "Create invitation" }));
+    expect(await screen.findByText(code)).toBeInTheDocument();
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/api/v1/orgs/o1/invitations");
+    expect(JSON.parse(init.body as string)).toEqual({
+      email: "grace@example.test",
+      role: "viewer",
+    });
+    expect(setItem).not.toHaveBeenCalled();
+    setItem.mockRestore();
+  });
+
+  it("joins with a code and reports the server's refusal plainly", async () => {
+    fetchMock.mockReturnValue(reply(404, { error: { code: "NOT_FOUND", message: "x" } }));
+    const user = userEvent.setup();
+    render(wrap(<AcceptInvitationForm />));
+    expect(screen.getByRole("button", { name: "Join" })).toBeDisabled();
+    await user.type(screen.getByLabelText(/Invitation code/), "B".repeat(43));
+    await user.click(screen.getByRole("button", { name: "Join" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /no longer exists, or you can’t see it/,
+    );
   });
 });

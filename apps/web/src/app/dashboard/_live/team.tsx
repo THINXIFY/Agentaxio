@@ -1,7 +1,8 @@
 import { Panel } from "@/components/dashboard/panel";
 import { PageHeader } from "@/components/layout/page-header";
+import { InviteForm } from "@/components/live/forms";
 import { Badge } from "@/components/ui/badge";
-import type { LiveSession } from "@/lib/api/server";
+import { canManage, type LiveSession } from "@/lib/api/server";
 import { formatDateTimeUtc } from "@/lib/format";
 import { gate, LoadFailed } from "./gate";
 import { getMembers } from "./data";
@@ -43,11 +44,21 @@ export async function LiveTeamPage({ session }: { session: LiveSession }) {
           ))}
         </ul>
       </Panel>
+      {canManage(org.role) ? (
+        <Panel
+          id="invite"
+          title="Invite a colleague"
+          description="Approvals need a second person: nobody can approve their own agent’s requests."
+          className="mt-6"
+        >
+          <InviteForm orgBase={org.base} />
+        </Panel>
+      ) : null}
       <p className="mt-6 max-w-3xl text-base leading-relaxed text-muted-foreground">
         <Badge tone="neutral" className="mr-2">
           Not built yet
         </Badge>
-        Inviting people and changing roles is available through the API but has no screen yet.
+        Changing roles and removing people is available through the API but has no screen yet.
       </p>
     </>
   );

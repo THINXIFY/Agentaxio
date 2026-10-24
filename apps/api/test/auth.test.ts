@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { hashToken } from "../src/auth/tokens";
 import { isMultiFactor } from "../src/auth/oidc";
@@ -572,5 +573,31 @@ describe("CSRF and request origin", () => {
       }),
     );
     expect([403, 415, 422]).toContain(wrongType.status);
+  });
+});
+
+describe("login transactions in the database", () => {
+  it("are consumed once, only by the browser that started them, and in parallel by exactly one caller", async () => {
+    const pool = h.world.managementPool;
+    const start = async () => {
+      const state = randomBytes(32);
+      const browser = randomBytes(32);
+      await pool.query(
+        "SELECT axo.start_login($1::bytea, $2::bytea, $3, $4::bytea, $5, $6, $7, $8::integer)",
+        [state, browser, "n".repeat(24), Buffer.from("sealed"), "k1", "/dashboard", false, 600],
+      );
+      return { state, browser };
+    };
+    const finish = (state: Buffer, browser: Buffer) =>
+      pool.query("SELECT * FROM axo.finish_login($1::bytea, $2::bytea)", [state, browser]);
+
+    const a = await start();
+    expect((await finish(a.state, randomBytes(32))).rowCount, "another browser").toBe(0);
+    expect((await finish(a.state, a.browser)).rowCount, "the right browser").toBe(1);
+    expect((await finish(a.state, a.browser)).rowCount, "replay").toBe(0);
+
+    const b = await start();
+    const racers = await Promise.all(Array.from({ length: 8 }, () => finish(b.state, b.browser)));
+    expect(racers.filter((r) => r.rowCount === 1)).toHaveLength(1);
   });
 });
