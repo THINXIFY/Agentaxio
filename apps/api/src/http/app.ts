@@ -97,6 +97,9 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     trustProxy: false,
   });
 
+  // The API speaks JSON only. Fastify also parses text/plain by default; remove it so any other content type is 415.
+  app.removeContentTypeParser("text/plain");
+
   const registry: RegisteredRoute[] = [];
   app.decorate("routeRegistry", registry);
   app.addHook("onRoute", (route) => {

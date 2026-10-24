@@ -12,8 +12,10 @@ $$;
 
 REVOKE ALL ON SCHEMA axo FROM PUBLIC;
 GRANT USAGE ON SCHEMA axo TO axo_agent_api, axo_management;
--- Functions are executable by PUBLIC unless revoked; make that the exception instead of the rule.
-ALTER DEFAULT PRIVILEGES IN SCHEMA axo REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
+-- PostgreSQL lets PUBLIC execute every new function unless told otherwise. This must be the database-wide default
+-- (NOT "IN SCHEMA axo": a schema-scoped REVOKE cannot remove the built-in grant to PUBLIC). It applies to every
+-- function this role creates from here on; migration 004 also sweeps all existing functions as a safety net.
+ALTER DEFAULT PRIVILEGES REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
 
 -- ---------------------------------------------------------------------------------------------------------------
 -- Tenant context. Transaction-local settings that row-level security policies read. They are never set from request

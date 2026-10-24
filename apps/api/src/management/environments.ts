@@ -1,6 +1,6 @@
 import { recordAudit } from "../audit";
 import { conflict, notFound } from "../errors";
-import { assertUuid, type ManagementContext } from "./context";
+import { assertUuid, requireAdmin, type ManagementContext } from "./context";
 
 /**
  * Emergency stop. A halted environment denies every new request from its agents (reason ENVIRONMENT_HALTED) while
@@ -13,6 +13,7 @@ async function setState(
   to: "active" | "halted",
   eventType: string,
 ): Promise<void> {
+  requireAdmin(context);
   assertUuid(environmentId, "environment id");
   const updated = await context.tx.query(
     "UPDATE axo.environments SET enforcement_state = $3 WHERE id = $1 AND enforcement_state = $2",

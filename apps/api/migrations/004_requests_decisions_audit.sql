@@ -252,3 +252,15 @@ BEGIN
 END
 $$;
 GRANT EXECUTE ON FUNCTION axo.enter_agent_context(uuid, boolean) TO axo_agent_api;
+
+-- Safety net: whatever else happened, no function in the axo schema is executable by PUBLIC. Explicit grants above
+-- (and only those) remain. Later migrations that add functions must grant EXECUTE explicitly to the roles that need it.
+DO $$
+DECLARE
+  f record;
+BEGIN
+  FOR f IN SELECT p.oid::regprocedure AS signature FROM pg_proc p WHERE p.pronamespace = 'axo'::regnamespace LOOP
+    EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC', f.signature);
+  END LOOP;
+END
+$$;

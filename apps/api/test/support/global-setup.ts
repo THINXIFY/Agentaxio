@@ -1,9 +1,7 @@
+import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
-import { createServer } from "node:net";
-import { tmpdir } from "node:os";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import EmbeddedPostgres from "embedded-postgres";
 import pg from "pg";
 import type { TestProject } from "vitest/node";
 import type { TestCluster } from "./cluster";
@@ -13,56 +11,66 @@ import type { TestCluster } from "./cluster";
  *
  *  - If AXO_TEST_ADMIN_URL is set (CI uses a postgres:17 service container), that server is used.
  *  - Otherwise a throw-away PostgreSQL 17 server is started from the `embedded-postgres` dev dependency (real
- *    PostgreSQL binaries run as an ordinary user process: nothing is installed system-wide).
+ *    PostgreSQL binaries run as an ordinary user process: nothing is installed system-wide). It runs in a separate
+ *    process (see pg-server.mjs) so that its exit hook cannot change this process's exit code.
  *
  * Roles are created once per cluster from sql/bootstrap-roles.sql, exactly as an operator would. Each test file then
  * creates its own database, so files can run in parallel.
  */
 
-function freePort(): Promise<number> {
+const secret = () => randomBytes(18).toString("hex");
+
+function startEmbeddedServer(): Promise<{ adminUrl: string; stop: () => Promise<void> }> {
   return new Promise((resolve, reject) => {
-    const server = createServer();
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", () => {
-      const address = server.address();
-      const port = typeof address === "object" && address !== null ? address.port : 0;
-      server.close(() => {
-        resolve(port);
+    const child: ChildProcessWithoutNullStreams = spawn(
+      process.execPath,
+      [join(import.meta.dirname, "pg-server.mjs")],
+      { cwd: join(import.meta.dirname, "..", ".."), stdio: ["pipe", "pipe", "pipe"] },
+    );
+    let buffered = "";
+    const failure = (reason: string) => {
+      child.kill();
+      reject(new Error(`embedded PostgreSQL did not start: ${reason}`));
+    };
+    const timer = setTimeout(() => {
+      failure("timed out");
+    }, 90_000);
+    child.stdout.on("data", (chunk: Buffer) => {
+      buffered += chunk.toString("utf8");
+      const line = buffered.split("\n")[0];
+      if (line === undefined || !buffered.includes("\n")) return;
+      clearTimeout(timer);
+      const info = JSON.parse(line) as { port: number; password: string };
+      resolve({
+        adminUrl: `postgres://postgres:${info.password}@127.0.0.1:${String(info.port)}/postgres`,
+        stop: () =>
+          new Promise<void>((done) => {
+            child.once("exit", () => {
+              done();
+            });
+            child.stdin.write("stop\n");
+            setTimeout(() => {
+              child.kill();
+              done();
+            }, 20_000).unref();
+          }),
       });
+    });
+    child.once("exit", (code) => {
+      clearTimeout(timer);
+      reject(new Error(`embedded PostgreSQL exited early (${String(code)})`));
     });
   });
 }
-
-const secret = () => randomBytes(18).toString("hex");
 
 export default async function setup(project: TestProject): Promise<() => Promise<void>> {
   let stop: () => Promise<void> = () => Promise.resolve();
   let adminUrl = process.env.AXO_TEST_ADMIN_URL;
 
   if (adminUrl === undefined || adminUrl === "") {
-    const dir = mkdtempSync(join(tmpdir(), "axo-pg-"));
-    const port = await freePort();
-    const password = secret();
-    const server = new EmbeddedPostgres({
-      databaseDir: dir,
-      user: "postgres",
-      password,
-      port,
-      persistent: true,
-      onLog: () => undefined,
-      onError: () => undefined,
-    });
-    await server.initialise();
-    await server.start();
-    adminUrl = `postgres://postgres:${password}@127.0.0.1:${String(port)}/postgres`;
-    stop = async () => {
-      await server.stop();
-      try {
-        rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
-      } catch {
-        /* Windows may hold a handle briefly; the directory lives in the OS temp folder. */
-      }
-    };
+    const started = await startEmbeddedServer();
+    adminUrl = started.adminUrl;
+    stop = started.stop;
   }
 
   const admin = new pg.Client({ connectionString: adminUrl });

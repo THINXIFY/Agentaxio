@@ -1,6 +1,6 @@
 import { recordAudit } from "../audit";
 import { conflict, invalid, notFound } from "../errors";
-import { assertUuid, type ManagementContext } from "./context";
+import { assertUuid, requireAdmin, type ManagementContext } from "./context";
 import { cancelInFlightRequests } from "./cancel";
 
 /**
@@ -26,6 +26,7 @@ export async function registerAgent(
   context: ManagementContext,
   input: { environmentId: string; ownerUserId: string; name: string; description?: string },
 ): Promise<{ agentId: string }> {
+  requireAdmin(context);
   assertUuid(input.environmentId, "environment id");
   assertUuid(input.ownerUserId, "owner user id");
   const name = input.name.trim();
@@ -68,6 +69,7 @@ export async function suspendAgent(
   context: ManagementContext,
   input: { agentId: string },
 ): Promise<{ cancelledRequests: number }> {
+  requireAdmin(context);
   assertUuid(input.agentId, "agent id");
   const updated = await context.tx.query(
     "UPDATE axo.agents SET status = 'suspended', suspended_at = clock_timestamp() WHERE id = $1 AND status = 'active'",
@@ -91,6 +93,7 @@ export async function resumeAgent(
   context: ManagementContext,
   input: { agentId: string },
 ): Promise<void> {
+  requireAdmin(context);
   assertUuid(input.agentId, "agent id");
   const updated = await context.tx.query(
     "UPDATE axo.agents SET status = 'active', suspended_at = NULL WHERE id = $1 AND status = 'suspended'",
@@ -107,6 +110,7 @@ export async function revokeAgent(
   context: ManagementContext,
   input: { agentId: string },
 ): Promise<{ cancelledRequests: number; revokedCredentials: number }> {
+  requireAdmin(context);
   assertUuid(input.agentId, "agent id");
   const updated = await context.tx.query(
     "UPDATE axo.agents SET status = 'revoked', revoked_at = clock_timestamp() WHERE id = $1 AND status <> 'revoked'",

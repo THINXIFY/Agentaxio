@@ -1,4 +1,6 @@
 import { randomBytes } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import pg from "pg";
 import { inject } from "vitest";
 import { migrate } from "../../src/db/migrate";
@@ -34,7 +36,9 @@ function withDatabase(
  * A fresh database on the shared real-PostgreSQL cluster, owned by axo_migrator and migrated from scratch exactly
  * the way an operator would do it. Each test file gets its own, so files run in parallel without interference.
  */
-export async function createTestDatabase(): Promise<TestDatabase> {
+export async function createTestDatabase(
+  options: { migrate?: boolean } = {},
+): Promise<TestDatabase> {
   const cluster = inject("axoCluster");
   const name = `axo_t_${randomBytes(6).toString("hex")}`;
   const adminUrl = withDatabase(cluster.adminUrl, name);
@@ -49,20 +53,28 @@ export async function createTestDatabase(): Promise<TestDatabase> {
   await setup.connect();
   try {
     await setup.query(`CREATE DATABASE ${name} OWNER axo_migrator`);
-    await setup.query(`REVOKE ALL ON DATABASE ${name} FROM PUBLIC`);
-    await setup.query(
-      `GRANT CONNECT ON DATABASE ${name} TO axo_agent_api, axo_management, axo_migrator`,
-    );
   } finally {
     await setup.end();
   }
-
-  const migrator = new pg.Client({ connectionString: urls.migrator });
-  await migrator.connect();
+  // The same hardening step an operator runs once per database, before the migrations.
+  const harden = new pg.Client({ connectionString: adminUrl });
+  await harden.connect();
   try {
-    await migrate(migrator);
+    await harden.query(
+      readFileSync(join(import.meta.dirname, "..", "..", "sql", "harden-database.sql"), "utf8"),
+    );
   } finally {
-    await migrator.end();
+    await harden.end();
+  }
+
+  if (options.migrate !== false) {
+    const migrator = new pg.Client({ connectionString: urls.migrator });
+    await migrator.connect();
+    try {
+      await migrate(migrator);
+    } finally {
+      await migrator.end();
+    }
   }
 
   const pools: pg.Pool[] = [];

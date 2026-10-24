@@ -31,6 +31,12 @@ export type Tx = pg.PoolClient;
 export async function inTransaction<T>(pool: pg.Pool, work: (tx: Tx) => Promise<T>): Promise<T> {
   const client = await pool.connect();
   let broken = false;
+  // A connection that dies while checked out emits an error event on the client itself. Unhandled, that would crash the
+  // whole process; here it marks the connection as unusable, and the in-flight query rejects (which fails closed).
+  const onClientError = () => {
+    broken = true;
+  };
+  client.on("error", onClientError);
   try {
     await client.query("BEGIN");
     await client.query(`SET LOCAL lock_timeout = ${String(LIMITS.lockTimeoutMs)}`);
@@ -46,6 +52,7 @@ export async function inTransaction<T>(pool: pg.Pool, work: (tx: Tx) => Promise<
     }
     throw error;
   } finally {
+    client.off("error", onClientError);
     client.release(broken);
   }
 }

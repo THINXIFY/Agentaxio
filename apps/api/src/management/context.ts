@@ -1,5 +1,5 @@
 import type pg from "pg";
-import { invalid, translateDbError } from "../errors";
+import { forbidden, invalid, translateDbError } from "../errors";
 import { inTransaction, type Tx } from "../db/pool";
 
 /**
@@ -51,4 +51,14 @@ export async function withManagement<T>(
   } catch (error) {
     throw translateDbError(error);
   }
+}
+
+/**
+ * Writes need the owner or admin role. The database enforces this independently (row-level security on every write);
+ * this check exists so a viewer or approver gets a clear "forbidden" instead of a misleading "not found" or
+ * "conflict" from a statement that row-level security silently filtered to zero rows. The role is the one the database
+ * read from the memberships table when the context was entered, never a value supplied by the caller.
+ */
+export function requireAdmin(context: ManagementContext): void {
+  if (context.role !== "owner" && context.role !== "admin") throw forbidden();
 }

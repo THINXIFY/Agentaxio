@@ -1,7 +1,7 @@
 import { recordAudit } from "../audit";
 import { generateCredential } from "../credentials/keys";
 import { conflict, invalid, notFound } from "../errors";
-import { assertUuid, type ManagementContext } from "./context";
+import { assertUuid, requireAdmin, type ManagementContext } from "./context";
 import { cancelInFlightRequests } from "./cancel";
 
 /**
@@ -72,6 +72,7 @@ export async function issueCredential(
   pepper: Buffer,
   input: { agentId: string; expiresAt?: Date },
 ): Promise<IssuedCredential> {
+  requireAdmin(context);
   assertUuid(input.agentId, "agent id");
   if (input.expiresAt !== undefined && input.expiresAt.getTime() <= Date.now()) {
     throw invalid("expiry must be in the future");
@@ -85,6 +86,7 @@ export async function revokeCredential(
   context: ManagementContext,
   input: { credentialId: string; reason?: "manual" | "rotated" },
 ): Promise<{ cancelledRequests: number }> {
+  requireAdmin(context);
   assertUuid(input.credentialId, "credential id");
   const updated = await context.tx.query<{ agent_id: string }>(
     `UPDATE axo.agent_credentials SET revoked_at = clock_timestamp(), revoked_reason = $2
@@ -122,6 +124,7 @@ export async function rotateCredential(
   pepper: Buffer,
   input: { agentId: string; credentialId: string; expiresAt?: Date },
 ): Promise<IssuedCredential & { cancelledRequests: number }> {
+  requireAdmin(context);
   assertUuid(input.agentId, "agent id");
   assertUuid(input.credentialId, "credential id");
   const status = await lockAgent(context, input.agentId);
