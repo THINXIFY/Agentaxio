@@ -332,7 +332,13 @@ export function buildManagementApp(deps: ManagementAppDeps): FastifyInstance {
       reply.header("set-cookie", clearBinding);
       if (error instanceof LoginError) {
         request.log.warn({ kind: error.code }, "login refused");
-        return back(error.code === "stale_authentication" ? "reauth" : "failed");
+        return back(
+          error.code === "stale_authentication"
+            ? "reauth"
+            : error.code === "account_disabled"
+              ? "disabled"
+              : "failed",
+        );
       }
       throw error;
     }
@@ -382,14 +388,18 @@ export function buildManagementApp(deps: ManagementAppDeps): FastifyInstance {
         (await limited(reply, RATE_LIMITS.managementWrites, hashToken(token).toString("hex")))
       )
         return reply;
-      const body = parseBody(
-        z.strictObject({ name: z.string().max(200), slug: z.string().max(60) }),
-        request.body,
-      );
+      // The session and the CSRF token are checked before the body is even looked at.
       const created = await withSession(
         deps.pool,
         { sessionToken: token, csrfToken: csrfHeader(request), mutating: true },
-        (session) => createOrganization(session, body),
+        (session) =>
+          createOrganization(
+            session,
+            parseBody(
+              z.strictObject({ name: z.string().max(200), slug: z.string().max(60) }),
+              request.body,
+            ),
+          ),
       );
       return reply.code(201).send(created);
     },
@@ -405,11 +415,14 @@ export function buildManagementApp(deps: ManagementAppDeps): FastifyInstance {
         (await limited(reply, RATE_LIMITS.managementWrites, hashToken(token).toString("hex")))
       )
         return reply;
-      const body = parseBody(z.strictObject({ token: z.string().max(100) }), request.body);
       const accepted = await withSession(
         deps.pool,
         { sessionToken: token, csrfToken: csrfHeader(request), mutating: true },
-        (session) => acceptInvitation(session, body),
+        (session) =>
+          acceptInvitation(
+            session,
+            parseBody(z.strictObject({ token: z.string().max(100) }), request.body),
+          ),
       );
       return accepted;
     },
@@ -438,7 +451,6 @@ export function buildManagementApp(deps: ManagementAppDeps): FastifyInstance {
         const subject = hashToken(token).toString("hex");
         if (await limited(reply, spec.rule ?? RATE_LIMITS.managementWrites, subject)) return reply;
       }
-      const body = spec.schema ? parseBody(spec.schema, request.body) : (undefined as T);
       const result = await withManagement(
         deps.pool,
         {
@@ -447,7 +459,12 @@ export function buildManagementApp(deps: ManagementAppDeps): FastifyInstance {
           mutating: spec.mutating,
           organizationId: orgId,
         },
-        (context) => spec.handler(context, request, body),
+        (context) =>
+          spec.handler(
+            context,
+            request,
+            spec.schema ? parseBody(spec.schema, request.body) : (undefined as T),
+          ),
       );
       if (spec.mutating && spec.method === "POST") return reply.code(200).send(result ?? {});
       return result;
@@ -697,14 +714,11 @@ export function buildManagementApp(deps: ManagementAppDeps): FastifyInstance {
         (await limited(reply, RATE_LIMITS.approvalDecisions, hashToken(token).toString("hex")))
       )
         return reply;
-      const body = parseBody(
-        z.strictObject({
-          decision: z.enum(["approve", "reject"]),
-          reviewedDigest: z.string().regex(/^[0-9a-f]{64}$/),
-          comment: z.string().max(500).optional(),
-        }),
-        request.body,
-      );
+      const decisionBody = z.strictObject({
+        decision: z.enum(["approve", "reject"]),
+        reviewedDigest: z.string().regex(/^[0-9a-f]{64}$/),
+        comment: z.string().max(500).optional(),
+      });
       // The decision is committed (with its audit record) BEFORE the answer is chosen, so a blocked attempt is on record.
       const result = await withManagement(
         deps.pool,
@@ -714,13 +728,15 @@ export function buildManagementApp(deps: ManagementAppDeps): FastifyInstance {
           mutating: true,
           organizationId: orgId,
         },
-        (context) =>
-          decideApproval(context, {
+        (context) => {
+          const body = parseBody(decisionBody, request.body);
+          return decideApproval(context, {
             approvalId,
             decision: body.decision,
             reviewedDigest: body.reviewedDigest,
             ...(body.comment === undefined ? {} : { comment: body.comment }),
-          }),
+          });
+        },
       );
       switch (result.outcome) {
         case "approved":

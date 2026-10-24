@@ -139,12 +139,26 @@ export async function finishLogin(
   const client = await deps.pool.connect();
   try {
     await client.query("BEGIN");
-    const user = await client.query<{ id: string }>("SELECT axo.login_user($1, $2, $3, $4) AS id", [
-      identity.issuer,
-      identity.subject,
-      identity.email,
-      identity.emailVerified,
-    ]);
+    let user;
+    try {
+      user = await client.query<{ id: string }>("SELECT axo.login_user($1, $2, $3, $4) AS id", [
+        identity.issuer,
+        identity.subject,
+        identity.email,
+        identity.emailVerified,
+      ]);
+    } catch (error) {
+      // The database refuses a disabled account with insufficient_privilege.
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        "code" in error &&
+        error.code === "42501"
+      ) {
+        throw new LoginError("this account is disabled", "account_disabled", { cause: error });
+      }
+      throw error;
+    }
     const userId = user.rows[0]?.id;
     if (userId === undefined) throw new Error("login returned no user");
     await client.query(

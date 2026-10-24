@@ -1,3 +1,4 @@
+import { createRemoteJWKSet, jwtVerify, type JWTPayload } from "jose";
 import * as oidc from "openid-client";
 import type { OidcConfig } from "../config";
 
@@ -13,6 +14,7 @@ import type { OidcConfig } from "../config";
 export interface OidcClient {
   config: oidc.Configuration;
   settings: OidcConfig;
+  jwks: ReturnType<typeof createRemoteJWKSet>;
 }
 
 export async function createOidcClient(settings: OidcConfig): Promise<OidcClient> {
@@ -26,7 +28,11 @@ export async function createOidcClient(settings: OidcConfig): Promise<OidcClient
     // eslint-disable-next-line @typescript-eslint/no-deprecated
     settings.allowInsecure ? { execute: [oidc.allowInsecureRequests] } : undefined,
   );
-  return { config, settings };
+  const metadata = config.serverMetadata();
+  if (metadata.jwks_uri === undefined) {
+    throw new Error("the identity provider publishes no signing keys");
+  }
+  return { config, settings, jwks: createRemoteJWKSet(new URL(metadata.jwks_uri)) };
 }
 
 export interface LoginSecrets {
@@ -100,9 +106,41 @@ export function isMultiFactor(amr: readonly string[]): boolean {
 export class LoginError extends Error {
   constructor(
     message: string,
-    readonly code: "provider_error" | "invalid_response" | "stale_authentication",
+    readonly code:
+      "provider_error" | "invalid_response" | "stale_authentication" | "account_disabled",
+    options?: { cause?: unknown },
   ) {
-    super(message);
+    super(message, options);
+  }
+}
+
+/**
+ * Verify the ID token's SIGNATURE against the provider's published keys, plus issuer, audience, expiry, signing
+ * algorithm (RS256 or ES256 only) and nonce. The OpenID rules let a client rely on TLS alone for a token received on
+ * the back channel; we deliberately do not, so a transport mistake (or a development http:// provider) can never
+ * remove all proof that the token is genuine.
+ */
+async function verifiedClaims(
+  client: OidcClient,
+  idToken: string | undefined,
+  nonce: string,
+  now: Date,
+): Promise<JWTPayload> {
+  if (idToken === undefined) {
+    throw new LoginError("no identity token was returned", "invalid_response");
+  }
+  try {
+    const { payload } = await jwtVerify(idToken, client.jwks, {
+      issuer: client.config.serverMetadata().issuer,
+      audience: client.settings.clientId,
+      algorithms: ["RS256", "ES256"],
+      clockTolerance: 60,
+      currentDate: now,
+    });
+    if (payload.nonce !== nonce) throw new Error("nonce mismatch");
+    return payload;
+  } catch (cause) {
+    throw new LoginError("the identity token could not be verified", "invalid_response", { cause });
   }
 }
 
@@ -125,16 +163,14 @@ export async function completeLogin(
       expectedNonce: expected.nonce,
       idTokenExpected: true,
     });
-  } catch {
-    throw new LoginError("the identity provider's response was not accepted", "invalid_response");
+  } catch (cause) {
+    // The cause is kept for diagnosis by a developer; it is never logged or shown to the person.
+    throw new LoginError("the identity provider's response was not accepted", "invalid_response", {
+      cause,
+    });
   }
-  const claims = tokens.claims();
-  if (
-    claims === undefined ||
-    typeof claims.sub !== "string" ||
-    claims.sub === "" ||
-    claims.sub.length > 255
-  ) {
+  const claims = await verifiedClaims(client, tokens.id_token, expected.nonce, now);
+  if (typeof claims.sub !== "string" || claims.sub === "" || claims.sub.length > 255) {
     throw new LoginError("the identity token has no subject", "invalid_response");
   }
   const amr = Array.isArray(claims.amr)
