@@ -2,7 +2,7 @@
 
 Authorization, human approval and audit for AI agent actions that run through AgentAxio-controlled enforcement points.
 
-**Current state:** the approved frontend (`apps/web`, mock data) and the M01 backend (`apps/api`, `packages/contracts`, `packages/policy`): agent authentication, deterministic policy decisions, an audit trail, and agent/credential/policy management on a real PostgreSQL database, **local only**. It decides and records; it does not approve or execute anything yet (M02). Nothing here enforces real permissions, and the frontend is not connected to it. See [`docs/BE-01-BACKEND.md`](docs/BE-01-BACKEND.md) and [`docs/M01-ACCEPTANCE.md`](docs/M01-ACCEPTANCE.md).
+**Current state:** the approved frontend (`apps/web`) and the backend (`apps/api`, `apps/mock-crm`, `packages/contracts`, `packages/policy`): agent authentication, deterministic policy decisions, human sign-in (OpenID Connect), human approvals, single-use grants, a trusted executor that calls a **mock** CRM, an audit trail, and a live dashboard, on a real PostgreSQL database, **local only**. Without `AXO_API_URL` the dashboard shows labelled sample data; with it, it reads and changes real local records. Nothing is deployed, no real identity provider is connected, and nothing has had an independent security review. See [`docs/BE-02-BACKEND.md`](docs/BE-02-BACKEND.md), [`docs/M02-ACCEPTANCE.md`](docs/M02-ACCEPTANCE.md) and (earlier) [`docs/BE-01-BACKEND.md`](docs/BE-01-BACKEND.md).
 
 - Product and architecture: [`docs/`](docs) and [`CLAUDE.md`](CLAUDE.md)
 - Frontend foundation, structure, rules and open conflicts: [`docs/FRONTEND-FOUNDATION.md`](docs/FRONTEND-FOUNDATION.md)

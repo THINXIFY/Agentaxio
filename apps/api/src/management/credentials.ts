@@ -1,7 +1,7 @@
 import { recordAudit } from "../audit";
 import { generateCredential } from "../credentials/keys";
 import { conflict, invalid, notFound } from "../errors";
-import { assertUuid, requireAdmin, type ManagementContext } from "./context";
+import { assertUuid, requireAdmin, requireStepUp, type ManagementContext } from "./context";
 import { cancelInFlightRequests } from "./cancel";
 
 /**
@@ -73,6 +73,7 @@ export async function issueCredential(
   input: { agentId: string; expiresAt?: Date },
 ): Promise<IssuedCredential> {
   requireAdmin(context);
+  requireStepUp(context);
   assertUuid(input.agentId, "agent id");
   if (input.expiresAt !== undefined && input.expiresAt.getTime() <= Date.now()) {
     throw invalid("expiry must be in the future");
@@ -125,6 +126,7 @@ export async function rotateCredential(
   input: { agentId: string; credentialId: string; expiresAt?: Date },
 ): Promise<IssuedCredential & { cancelledRequests: number }> {
   requireAdmin(context);
+  requireStepUp(context);
   assertUuid(input.agentId, "agent id");
   assertUuid(input.credentialId, "credential id");
   const status = await lockAgent(context, input.agentId);

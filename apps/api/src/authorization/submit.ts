@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type pg from "pg";
 import {
   IdempotencyKeySchema,
@@ -9,9 +10,11 @@ import {
 } from "@agentaxio/contracts";
 import { evaluatePolicy } from "@agentaxio/policy";
 import { LIMITS } from "../config";
+import { encryptJson, parametersAad, type KeyRing } from "../crypto/data-keys";
+import { RATE_LIMITS, rateLimitHit } from "../ratelimit";
 import { inTransaction, type Tx } from "../db/pool";
 import { recordAudit } from "../audit";
-import { authenticateAgent, type AgentContext } from "./authenticate";
+import { authenticateAgent, verifyAgentSecret, type AgentContext } from "./authenticate";
 import { loadCurrentPolicies } from "./policies";
 
 /**
@@ -19,8 +22,8 @@ import { loadCurrentPolicies } from "./policies";
  *
  * One transaction does everything: authenticate and lock (axo.enter_agent_context), check idempotency, load the
  * current policies, evaluate, write the request, the decision and the audit events. It commits or leaves no trace
- * (apart from an audit event for a rejected-invalid request). Nothing is executed: M01 stops at "queued_execution"
- * and "pending_approval"; approval and execution arrive with M02.
+ * (apart from an audit event for a rejected-invalid request). Nothing is executed here: the request ends at
+ * "queued_execution" (authorized, waiting for the trusted executor) or "pending_approval" (waiting for a person).
  *
  * The agent row is locked FOR UPDATE for the whole transaction, so requests from one agent are serialized. That makes
  * idempotency and the pending cap exact, and makes "suspend the agent" wait for in-flight decisions instead of racing
@@ -50,7 +53,7 @@ export type SubmitOutcome =
   | { kind: "agent_suspended" }
   | { kind: "invalid"; issues: readonly string[] }
   | { kind: "idempotency_conflict" }
-  | { kind: "rate_limited" };
+  | { kind: "rate_limited"; retryAfterSeconds: number };
 
 interface RequestRow {
   id: string;
@@ -59,16 +62,30 @@ interface RequestRow {
   reason_code: ReasonCode | null;
 }
 
-/** Status with expiry applied, so correctness never depends on a background sweeper having run. */
-const EFFECTIVE_STATUS = `CASE WHEN r.status IN ('pending_approval', 'approved', 'queued_execution')
-                               AND r.expires_at <= clock_timestamp() THEN 'expired' ELSE r.status END`;
+/**
+ * Status with expiry applied, so correctness never depends on a background sweeper having run: a pending request
+ * past its approval deadline, and a queued request whose unclaimed grant has lapsed, both read as expired.
+ */
+const EFFECTIVE_STATUS = `CASE
+  WHEN r.status = 'pending_approval' AND r.expires_at <= clock_timestamp() THEN 'expired'
+  WHEN r.status = 'queued_execution' AND g.consumed_at IS NULL AND g.expires_at <= clock_timestamp() THEN 'expired'
+  ELSE r.status END`;
 
+/**
+ * The reason code an agent may see. Only states that are explained by a reason carry one: a request that went on to
+ * succeed does not keep reporting "human review required".
+ */
 export const REQUEST_SELECT = `
   SELECT r.id, ${EFFECTIVE_STATUS} AS status, r.canonical_digest,
-         CASE WHEN ${EFFECTIVE_STATUS} = 'expired' AND d.reason_code = 'HUMAN_REVIEW_REQUIRED'
-              THEN 'APPROVAL_EXPIRED' WHEN ${EFFECTIVE_STATUS} = 'expired' THEN NULL
-              ELSE d.reason_code END AS reason_code
+         CASE ${EFFECTIVE_STATUS}
+           WHEN 'expired' THEN CASE WHEN r.status = 'pending_approval' THEN 'APPROVAL_EXPIRED' ELSE 'GRANT_EXPIRED' END
+           WHEN 'failed' THEN 'EXECUTION_FAILED'
+           WHEN 'unknown' THEN 'OUTCOME_UNKNOWN'
+           WHEN 'denied' THEN d.reason_code
+           WHEN 'pending_approval' THEN d.reason_code
+           ELSE NULL END AS reason_code
     FROM axo.action_requests r
+    LEFT JOIN axo.execution_grants g ON g.action_request_id = r.id AND g.organization_id = r.organization_id
     LEFT JOIN LATERAL (SELECT x.reason_code FROM axo.decisions x WHERE x.action_request_id = r.id
                         ORDER BY x.decided_at DESC, x.id DESC LIMIT 1) d ON true`;
 
@@ -153,13 +170,26 @@ async function decide(
   };
 }
 
+export interface AgentDeps {
+  pepper: Buffer;
+  dataKeys: KeyRing;
+}
+
 export async function submitActionRequest(
   pool: pg.Pool,
-  pepper: Buffer,
+  deps: AgentDeps,
   input: SubmitInput,
 ): Promise<SubmitOutcome> {
+  // Before any lock is taken: prove the secret, then spend one unit of this agent's allowance in its own transaction (so
+  // a request that is later refused or rolled back still counts). A caller without the secret never touches the limit.
+  const known = await verifyAgentSecret(pool, deps.pepper, input.authorization);
+  if (known.kind !== "ok") return { kind: "unauthenticated" };
+  const allowance = await rateLimitHit(pool, RATE_LIMITS.agentRequests, known.agentId);
+  if (!allowance.allowed)
+    return { kind: "rate_limited", retryAfterSeconds: allowance.retryAfterSeconds };
+
   return inTransaction(pool, async (tx): Promise<SubmitOutcome> => {
-    const auth = await authenticateAgent(tx, pepper, input.authorization, { write: true });
+    const auth = await authenticateAgent(tx, deps.pepper, input.authorization, { write: true });
     if (auth.kind !== "ok") return { kind: auth.kind };
     const ctx = auth.context;
     const actor = {
@@ -205,7 +235,7 @@ export async function submitActionRequest(
       decision.result === "require_approval" &&
       ctx.pendingRequests >= LIMITS.maxPendingPerAgent
     ) {
-      return { kind: "rate_limited" };
+      return { kind: "rate_limited", retryAfterSeconds: 30 };
     }
 
     const initialStatus: ActionRequestStatus =
@@ -215,14 +245,23 @@ export async function submitActionRequest(
           ? "pending_approval"
           : "approved";
     const ttl = initialStatus === "approved" ? LIMITS.queueTtlSeconds : LIMITS.approvalTtlSeconds;
-    const inserted = await tx.query<{ id: string }>(
+    // The parameters are encrypted here, bound to this row (organization, request id, digest); the database only ever
+    // stores the ciphertext.
+    const requestId = randomUUID();
+    const sealed = encryptJson(
+      deps.dataKeys,
+      requested.parameters,
+      parametersAad(ctx.organizationId, requestId, digest),
+    );
+    const inserted = await tx.query<{ id: string; expires_at: Date }>(
       `INSERT INTO axo.action_requests
-         (organization_id, agent_id, environment_id, action_key, resource, request_key, canonical_digest,
-          canonical_parameters, status, originating_credential_id, expires_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, clock_timestamp() + make_interval(secs => $11))
+         (id, organization_id, agent_id, environment_id, action_key, resource, request_key, canonical_digest,
+          parameters_ciphertext, parameters_key_id, status, originating_credential_id, expires_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, clock_timestamp() + make_interval(secs => $13))
        ON CONFLICT (organization_id, agent_id, request_key) DO NOTHING
-       RETURNING id`,
+       RETURNING id, expires_at`,
       [
+        requestId,
         ctx.organizationId,
         ctx.agentId,
         ctx.environmentId,
@@ -230,7 +269,8 @@ export async function submitActionRequest(
         requested.resource,
         key.data,
         digest,
-        JSON.stringify(requested.parameters),
+        sealed.ciphertext,
+        sealed.keyId,
         initialStatus,
         ctx.credentialId,
         ttl,
@@ -262,6 +302,31 @@ export async function submitActionRequest(
         decision.matched,
       ],
     );
+    if (initialStatus === "pending_approval") {
+      // The person who will decide sees this in their queue. It expires with the request.
+      await tx.query(
+        `INSERT INTO axo.approval_requests
+           (organization_id, action_request_id, requested_digest, policy_version_id, policy_epoch, expires_at)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [
+          ctx.organizationId,
+          created.id,
+          digest,
+          decision.policyVersionId,
+          ctx.policyEpoch,
+          created.expires_at,
+        ],
+      );
+      await recordAudit(tx, {
+        ...actor,
+        eventType: "approval.requested",
+        objectType: "action_request",
+        objectId: created.id,
+        requestId: created.id,
+        traceId: input.traceId,
+        metadata: { digest, policy_epoch: ctx.policyEpoch },
+      });
+    }
     await recordAudit(tx, {
       ...actor,
       eventType: "action_request.created",

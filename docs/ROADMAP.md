@@ -15,7 +15,7 @@ Version 1.0 | Phases are sequential with security gates; design runs in parallel
 ## Approved development order (frontend first)
 Owner decision 2026-10-20: the frontend is built and reviewed first, on clearly labelled mock data, in `apps/web` only.
 - **Frontend track:** FE-00 foundation (done) -> FE-01 marketing homepage -> remaining marketing pages -> dashboard UI on mock data.
-- **Backend track (gated):** M01 -> M02 -> M03, below. Phases 4–10 above keep their security exit criteria unchanged.
+- **Backend track (gated):** M01 (done, merged) -> M02 (built locally on branch `be-02-approvals-execution`, awaiting owner review; see `docs/M02-ACCEPTANCE.md`) -> M03, below. Phases 4–10 above keep their security exit criteria unchanged.
 - The frontend track does **not** relax any gate: no real authentication, real data, live integration, billing, production credentials or deployment until M01 passes and the owner approves. The UI never implies enforcement it does not have.
 
 ## Recommended immediate work for the backend track (when started)

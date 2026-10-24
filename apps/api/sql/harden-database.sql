@@ -5,7 +5,7 @@
 DO $$
 BEGIN
   EXECUTE format('REVOKE ALL ON DATABASE %I FROM PUBLIC', current_database());
-  EXECUTE format('GRANT CONNECT ON DATABASE %I TO axo_migrator, axo_agent_api, axo_management', current_database());
+  EXECUTE format('GRANT CONNECT ON DATABASE %I TO axo_migrator, axo_agent_api, axo_management, axo_executor', current_database());
   -- Nobody but the owner creates objects in the public schema, and the runtime roles never touch it.
   REVOKE ALL ON SCHEMA public FROM PUBLIC;
 END

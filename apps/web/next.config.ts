@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { apiBase } from "./src/lib/api/config";
 
 /**
  * Baseline hardening headers. A Content-Security-Policy is deliberately NOT set here yet:
@@ -17,6 +18,19 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
+  },
+  /**
+   * Live mode only (AXO_API_URL set): the browser talks to the management API through this site's own origin, so the
+   * session cookie is first-party. Exactly two prefixes are forwarded, to one fixed destination; there is no open proxy.
+   * Without AXO_API_URL nothing is forwarded and the dashboard stays in its labelled demo mode.
+   */
+  async rewrites() {
+    const base = apiBase();
+    if (base === null) return [];
+    return [
+      { source: "/api/auth/:path*", destination: `${base}/auth/:path*` },
+      { source: "/api/v1/:path*", destination: `${base}/v1/:path*` },
+    ];
   },
 };
 

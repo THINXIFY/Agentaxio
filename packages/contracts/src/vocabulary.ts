@@ -35,6 +35,8 @@ export const REASON_CODES = [
   "EVALUATOR_ERROR",
   "EXECUTION_FAILED",
   "OUTCOME_UNKNOWN",
+  "DIGEST_MISMATCH",
+  "GRANT_EXPIRED",
 ] as const;
 export type ReasonCode = (typeof REASON_CODES)[number];
 
@@ -49,5 +51,28 @@ export const ERROR_CODES = [
   "INVALID_REQUEST",
   "RATE_LIMITED",
   "SERVICE_UNAVAILABLE",
+  "STEP_UP_REQUIRED",
+  "CONFLICT",
+  "EXPIRED",
 ] as const;
+
+/** Human approval states (docs/BE-02-DECISIONS.md D7). Only `pending` can change; everything else is final. */
+export const APPROVAL_STATES = ["pending", "approved", "rejected", "expired", "canceled"] as const;
+export type ApprovalState = (typeof APPROVAL_STATES)[number];
+
+/** What recording a decision can answer. Only `approved` and `rejected` change anything. */
+export const APPROVAL_OUTCOMES = [
+  "approved",
+  "rejected",
+  "expired",
+  "already_decided",
+  "not_pending",
+  "self_approval",
+  "policy_author",
+  "digest_mismatch",
+] as const;
+export type ApprovalOutcome = (typeof APPROVAL_OUTCOMES)[number];
+
+export const EXECUTION_ATTEMPT_STATES = ["started", "succeeded", "failed", "unknown"] as const;
+export type ExecutionAttemptState = (typeof EXECUTION_ATTEMPT_STATES)[number];
 export type ErrorCode = (typeof ERROR_CODES)[number];

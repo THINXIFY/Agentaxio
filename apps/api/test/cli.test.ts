@@ -3,7 +3,7 @@ import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { seedDemo } from "../src/cli/seed";
 import { setupLocalDatabase } from "../src/cli/setup";
-import { loadConfig } from "../src/config";
+import { loadAgentApiConfig } from "../src/config";
 import { migrate } from "../src/db/migrate";
 import { createPool } from "../src/db/pool";
 import { buildApp } from "../src/http/app";
@@ -50,11 +50,15 @@ describe("db:setup", () => {
     expect(Object.keys(first.env).sort()).toEqual([
       "AXO_AGENT_API_DATABASE_URL",
       "AXO_CREDENTIAL_PEPPER",
+      "AXO_DATA_KEYS",
+      "AXO_DATA_KEY_ID",
+      "AXO_EXECUTOR_DATABASE_URL",
       "AXO_MANAGEMENT_DATABASE_URL",
       "AXO_MIGRATOR_DATABASE_URL",
+      "AXO_MOCK_CRM_TOKEN",
     ]);
     // The generated settings are accepted by the service's own configuration loader (pepper strength included).
-    expect(() => loadConfig({ ...first.env })).not.toThrow();
+    expect(() => loadAgentApiConfig({ ...first.env })).not.toThrow();
     const second = await setupLocalDatabase(server.adminUrl, database);
     expect(second.env.AXO_AGENT_API_DATABASE_URL).not.toBe(first.env.AXO_AGENT_API_DATABASE_URL);
     // The previous passwords no longer work: running it again rotated them.
@@ -76,7 +80,7 @@ describe("fresh clone: setup, migrate, seed, serve, request", () => {
   it("works end to end over a real socket, shows the key once, and the seeded policy requires approval", async () => {
     const database = `cli_${randomUUID().slice(0, 8)}_dev`;
     const { env } = await setupLocalDatabase(server.adminUrl, database);
-    const config = loadConfig({ ...env });
+    const config = loadAgentApiConfig({ ...env });
 
     const owner = new pg.Client({ connectionString: env.AXO_MIGRATOR_DATABASE_URL });
     await owner.connect();
@@ -99,7 +103,12 @@ describe("fresh clone: setup, migrate, seed, serve, request", () => {
     expect(again.agentKey).toBeUndefined();
 
     const pool = createPool(config.agentApiDatabaseUrl, "cli-test");
-    const app = buildApp({ agentPool: pool, pepper: config.pepper, logger: false });
+    const app = buildApp({
+      agentPool: pool,
+      pepper: config.pepper,
+      dataKeys: config.dataKeys,
+      logger: false,
+    });
     try {
       const address = await app.listen({ host: "127.0.0.1", port: 0 });
       const post = (key: string, body: unknown, headers: Record<string, string> = {}) =>
@@ -150,7 +159,7 @@ describe("fresh clone: setup, migrate, seed, serve, request", () => {
       seedDemo(
         env.AXO_MIGRATOR_DATABASE_URL ?? "",
         env.AXO_MANAGEMENT_DATABASE_URL ?? "",
-        loadConfig({ ...env }).pepper,
+        loadAgentApiConfig({ ...env }).pepper,
         {
           databaseName: /_production$/,
         },

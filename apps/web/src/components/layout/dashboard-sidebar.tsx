@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Logo } from "@/components/brand/logo";
 import { isNavItemActive, primaryNav, secondaryNav, type AppNavItem } from "@/config/navigation";
+import { useShellMode } from "@/components/layout/shell-mode";
 import { cn } from "@/lib/cn";
 
 function NavLink({ item, onNavigate }: { item: AppNavItem; onNavigate?: () => void }) {
@@ -49,6 +50,7 @@ export function DashboardSidebar({
   showLogo?: boolean;
   className?: string;
 }) {
+  const shell = useShellMode();
   return (
     <div className={cn("flex h-full flex-col", className)}>
       {showLogo ? (
@@ -77,7 +79,9 @@ export function DashboardSidebar({
             ))}
           </ul>
         </nav>
-        <p className="mt-3 px-3.5 text-sm text-muted-foreground">Demo · sample data</p>
+        <p className="mt-3 px-3.5 text-sm text-muted-foreground">
+          {shell.mode === "live" ? "Local backend · live data" : "Demo · sample data"}
+        </p>
       </div>
     </div>
   );
