@@ -18,6 +18,27 @@ jobs:
     name: Format, lint, types, tests, build
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # Real PostgreSQL 17 for the backend integration tests (nothing is mocked). Two servers: the second is used by the
+    # one test that runs the local-setup script, which rotates the passwords of the cluster-level roles. The passwords
+    # below belong to throw-away containers that exist only for this job; they protect nothing.
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: ci-throwaway-not-a-secret
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 20
+      postgres-isolated:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: ci-throwaway-not-a-secret
+        ports: ["5433:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      AXO_TEST_ADMIN_URL: postgres://postgres:ci-throwaway-not-a-secret@localhost:5432/postgres
+      AXO_TEST_ISOLATED_ADMIN_URL: postgres://postgres:ci-throwaway-not-a-secret@localhost:5433/postgres
     steps:
       - name: Check out
         uses: actions/checkout@v4
@@ -44,7 +65,7 @@ jobs:
       - name: TypeScript
         run: pnpm typecheck
 
-      - name: Vitest
+      - name: Vitest (web, contracts, policy, API with real PostgreSQL)
         run: pnpm test
 
       - name: Production build

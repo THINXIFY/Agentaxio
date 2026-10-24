@@ -1,0 +1,41 @@
+{
+  "name": "@agentaxio/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "AgentAxio authorization API: agent-api, management-api and executor roles (M01). Local only; scaffold.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "db:setup": "tsx --env-file=../../.env src/cli/setup.ts",
+    "db:migrate": "tsx --env-file=.env src/cli/migrate.ts",
+    "db:seed": "tsx --env-file=.env src/cli/seed.ts",
+    "dev": "tsx --env-file=.env src/cli/dev.ts"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^24.19.2",
+    "@types/pg": "^8.23.1",
+    "embedded-postgres": "17.9.0-beta.17",
+    "eslint": "9.39.5",
+    "globals": "^17.13.0",
+    "prettier": "^3.9.10",
+    "tsx": "^4.23.15",
+    "typescript": "5.9.3",
+    "typescript-eslint": "^8.72.0",
+    "vitest": "^5.0.5"
+  },
+  "dependencies": {
+    "@agentaxio/contracts": "workspace:*",
+    "@agentaxio/policy": "workspace:*",
+    "fastify": "^5.12.7",
+    "pg": "^8.23.1"
+  }
+}

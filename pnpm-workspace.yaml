@@ -5,4 +5,15 @@ packages:
 # Dependency install scripts are denied by default (supply-chain hygiene).
 # unrs-resolver ships prebuilt binaries as optional dependencies; its postinstall is only a fallback.
 allowBuilds:
+  # Prebuilt PostgreSQL 17 binaries for local tests; the postinstall only re-creates symlinks on macOS/Linux.
+  '@embedded-postgres/windows-x64': false
+  '@embedded-postgres/darwin-arm64': false
+  '@embedded-postgres/darwin-x64': false
+  '@embedded-postgres/linux-arm': false
+  '@embedded-postgres/linux-arm64': false
+  '@embedded-postgres/linux-ia32': false
+  '@embedded-postgres/linux-ppc64': false
+  '@embedded-postgres/linux-x64': false
+  # esbuild (via tsx) ships its binary as an optional platform package; the postinstall is only a fallback.
+  esbuild: false
   unrs-resolver: false
