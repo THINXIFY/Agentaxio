@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "AgentAxio authorization API: agent-api, management-api and executor roles (M01). Local only; scaffold.",
+  "description": "AgentAxio authorization API: agent-api, management-api and trusted executor roles (M01-M02). Local only; not deployed.",
   "exports": {
     ".": "./src/index.ts"
   },
@@ -17,7 +17,10 @@
     "db:setup": "tsx --env-file=../../.env src/cli/setup.ts",
     "db:migrate": "tsx --env-file=.env src/cli/migrate.ts",
     "db:seed": "tsx --env-file=.env src/cli/seed.ts",
-    "dev": "tsx --env-file=.env src/cli/dev.ts"
+    "dev": "tsx --env-file=.env src/cli/dev.ts",
+    "dev:stack": "tsx test/support/local-stack.ts",
+    "dev:management": "tsx --env-file=.env src/cli/management.ts",
+    "dev:executor": "tsx --env-file=.env src/cli/executor.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

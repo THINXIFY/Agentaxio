@@ -602,10 +602,11 @@ describe("managing agents, credentials and policies over HTTP", () => {
     const overview = (await owner.browser.get(url(org, "/overview"))).json<{
       agents: { active: number };
       pendingApprovals: number;
-      daily: unknown[];
+      daily: Array<{ approval: number; requests: number }>;
     }>();
     expect(overview).toMatchObject({ agents: { active: 0 }, pendingApprovals: 0 });
     expect(overview.daily).toHaveLength(7);
+    expect(overview.daily.every((d) => d.approval === 0 && d.requests === 0)).toBe(true);
   });
 });
 

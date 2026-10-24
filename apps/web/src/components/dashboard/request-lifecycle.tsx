@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Check, CircleHelp, Clock, Minus, X } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { lifecycleFor, type LifecycleState } from "@/mocks/dashboard";
+import { lifecycleFor, type LifecycleStage, type LifecycleState } from "@/mocks/dashboard";
 import type { DashboardRequest } from "@/mocks/dashboard";
 
 const STATE_TEXT: Record<LifecycleState, string> = {
@@ -60,7 +60,17 @@ export function RequestLifecycle({
   request: Pick<DashboardRequest, "status" | "reviewRequired">;
   className?: string;
 }) {
-  const stages = lifecycleFor(request);
+  return <LifecycleStages stages={lifecycleFor(request)} className={className} />;
+}
+
+/** The three stages as a list. Shared by the demo (derived from sample statuses) and live records (derived from real facts). */
+export function LifecycleStages({
+  stages,
+  className,
+}: {
+  stages: readonly LifecycleStage[];
+  className?: string;
+}) {
   return (
     <ol
       aria-label="Request lifecycle"

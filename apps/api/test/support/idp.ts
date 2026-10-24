@@ -53,6 +53,11 @@ export class TestIdp {
   lastTokenAuthorization: string | undefined;
   /** The user the next authorization will sign in as. */
   signInAs = "";
+  /**
+   * Local demo only: instead of signing in as `signInAs`, show a page that lets a person pick which invented user to be.
+   * Never set by the tests.
+   */
+  chooser = false;
   url = "";
 
   private server: Server | undefined;
@@ -77,7 +82,7 @@ export class TestIdp {
     this.users.set(key, { sub: `sub-${key}`, emailVerified: true, amr: ["pwd", "otp"], ...user });
   }
 
-  async start(): Promise<void> {
+  async start(port = 0): Promise<void> {
     this.signing = await generateKeyPair("RS256", { extractable: true });
     this.otherSigning = await generateKeyPair("RS256", { extractable: true });
     this.publicJwk = {
@@ -95,7 +100,7 @@ export class TestIdp {
         response,
       );
     });
-    await new Promise<void>((resolve) => this.server?.listen(0, "127.0.0.1", resolve));
+    await new Promise<void>((resolve) => this.server?.listen(port, "127.0.0.1", resolve));
     const address = this.server.address();
     this.url = `http://127.0.0.1:${typeof address === "object" && address !== null ? String(address.port) : "0"}`;
   }
@@ -160,7 +165,15 @@ export class TestIdp {
     if (url.pathname === "/authorize" && method === "GET") {
       const q = Object.fromEntries(url.searchParams.entries());
       this.authorizations.push({ query: q });
-      const user = this.users.get(this.signInAs);
+      if (this.chooser && q.login_as === undefined) {
+        response.writeHead(200, {
+          "content-type": "text/html; charset=utf-8",
+          "cache-control": "no-store",
+        });
+        response.end(this.chooserPage(url));
+        return;
+      }
+      const user = this.users.get(q.login_as ?? this.signInAs);
       if (
         user === undefined ||
         q.response_type !== "code" ||
@@ -225,6 +238,23 @@ export class TestIdp {
     }
     response.writeHead(404);
     response.end();
+  }
+
+  private chooserPage(url: URL): string {
+    const esc = (v: string) =>
+      v.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    const items = [...this.users.entries()]
+      .map(([key, user]) => {
+        const next = new URL(url);
+        next.searchParams.set("login_as", key);
+        return `<li><a href="${esc(next.pathname + next.search)}">${esc(user.email)}</a> <small>(${esc(user.amr.join(" + "))})</small></li>`;
+      })
+      .join("");
+    return `<!doctype html><meta charset="utf-8"><title>Local test identity provider</title>
+<body style="font-family:system-ui;max-width:34rem;margin:3rem auto;padding:0 1rem">
+<h1>Local test identity provider</h1>
+<p><strong>This is a development stand-in, not a real login.</strong> Pick an invented person to sign in as. A real deployment uses your organization's identity provider.</p>
+<ul>${items}</ul></body>`;
   }
 
   private async idToken(user: IdpUser, nonce: string, fresh: boolean): Promise<string> {

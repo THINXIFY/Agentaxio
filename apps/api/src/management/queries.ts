@@ -385,7 +385,14 @@ export interface Overview {
     unknown: number;
   };
   /** Requests per UTC day for the last 7 days, oldest first. */
-  daily: Array<{ day: string; requests: number; denied: number; succeeded: number }>;
+  daily: Array<{
+    day: string;
+    requests: number;
+    denied: number;
+    /** Waiting for a person, or expired without a decision. */
+    approval: number;
+    succeeded: number;
+  }>;
 }
 
 export async function overview(context: ManagementContext): Promise<Overview> {
@@ -415,11 +422,13 @@ export async function overview(context: ManagementContext): Promise<Overview> {
     day: Date;
     requests: number;
     denied: number;
+    approval: number;
     succeeded: number;
   }>(
     `SELECT (d AT TIME ZONE 'UTC')::date AS day,
             (SELECT count(*)::integer FROM axo.action_requests q WHERE q.created_at >= d AND q.created_at < d + interval '1 day') AS requests,
             (SELECT count(*)::integer FROM axo.action_requests q WHERE q.created_at >= d AND q.created_at < d + interval '1 day' AND q.status = 'denied') AS denied,
+            (SELECT count(*)::integer FROM axo.action_requests q WHERE q.created_at >= d AND q.created_at < d + interval '1 day' AND q.status IN ('pending_approval', 'expired')) AS approval,
             (SELECT count(*)::integer FROM axo.action_requests q WHERE q.created_at >= d AND q.created_at < d + interval '1 day' AND q.status = 'succeeded') AS succeeded
        FROM generate_series(date_trunc('day', now(), 'UTC') - interval '6 days', date_trunc('day', now(), 'UTC'), interval '1 day') d
       ORDER BY d`,
@@ -441,6 +450,7 @@ export async function overview(context: ManagementContext): Promise<Overview> {
       day: x.day.toISOString().slice(0, 10),
       requests: x.requests,
       denied: x.denied,
+      approval: x.approval,
       succeeded: x.succeeded,
     })),
   };
