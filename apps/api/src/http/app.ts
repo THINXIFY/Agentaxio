@@ -3,6 +3,8 @@ import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest }
 import type pg from "pg";
 import type { ErrorCode } from "@agentaxio/contracts";
 import { LIMITS } from "../config";
+import type { KeyRing } from "../crypto/data-keys";
+import { RATE_LIMITS, rateLimitExceeded, rateLimitHit } from "../ratelimit";
 import { bearerFromHeader, parseCredential } from "../credentials/keys";
 import { getActionRequestStatus } from "../authorization/status";
 import { submitActionRequest } from "../authorization/submit";
@@ -31,6 +33,7 @@ export interface RegisteredRoute {
 export interface AppDeps {
   agentPool: pg.Pool;
   pepper: Buffer;
+  dataKeys: KeyRing;
   /** Fastify logger options; `false` disables logging. */
   logger?: false | { level: string; stream?: { write(message: string): void } };
 }
@@ -55,6 +58,9 @@ const MESSAGES: Record<ErrorCode, string> = {
   INVALID_REQUEST: "The request is invalid.",
   RATE_LIMITED: "Too many pending requests. Try again later.",
   SERVICE_UNAVAILABLE: "The service could not complete the request. Nothing was authorized.",
+  STEP_UP_REQUIRED: "Not used by the agent API.",
+  CONFLICT: "The request conflicts with the current state.",
+  EXPIRED: "This has expired.",
 };
 
 function fail(
@@ -118,16 +124,32 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   });
 
   // Authentication comes first: a request without a well-formed credential is refused before its body is read.
-  app.addHook("onRequest", (request, reply, done) => {
-    if (request.routeOptions.config.auth === "agent") {
-      const presented = bearerFromHeader(header(request.headers.authorization));
-      if (presented === null || parseCredential(presented) === null) {
-        reply.header("www-authenticate", "Bearer");
-        fail(reply, 401, "UNAUTHENTICATED");
-        return;
-      }
+  // A source that keeps failing to authenticate is slowed down BEFORE any work is done for it. Only failures count, and
+  // only per source address: counting per key id would let anyone lock a legitimate agent out by guessing.
+  const refuseNoisySource = async (
+    request: FastifyRequest,
+    reply: FastifyReply,
+  ): Promise<boolean> => {
+    if (!(await rateLimitExceeded(deps.agentPool, RATE_LIMITS.agentAuthFailures, request.ip)))
+      return false;
+    reply.header("retry-after", "60");
+    fail(reply, 429, "RATE_LIMITED");
+    return true;
+  };
+  const recordAuthFailure = (request: FastifyRequest) =>
+    rateLimitHit(deps.agentPool, RATE_LIMITS.agentAuthFailures, request.ip);
+
+  app.addHook("onRequest", async (request, reply) => {
+    if (request.routeOptions.config.auth !== "agent") return;
+    if (await refuseNoisySource(request, reply)) return reply;
+    const presented = bearerFromHeader(header(request.headers.authorization));
+    if (presented === null || parseCredential(presented) === null) {
+      await recordAuthFailure(request);
+      reply.header("www-authenticate", "Bearer");
+      fail(reply, 401, "UNAUTHENTICATED");
+      return reply;
     }
-    done();
+    return undefined;
   });
 
   app.setNotFoundHandler((_request, reply) => fail(reply, 404, "NOT_FOUND"));
@@ -152,14 +174,19 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   });
 
   app.post("/v1/action-requests", { config: { auth: "agent" } }, async (request, reply) => {
-    const outcome = await submitActionRequest(deps.agentPool, deps.pepper, {
-      authorization: header(request.headers.authorization),
-      idempotencyKey: header(request.headers["idempotency-key"]),
-      body: request.body,
-      traceId: request.id,
-    });
+    const outcome = await submitActionRequest(
+      deps.agentPool,
+      { pepper: deps.pepper, dataKeys: deps.dataKeys },
+      {
+        authorization: header(request.headers.authorization),
+        idempotencyKey: header(request.headers["idempotency-key"]),
+        body: request.body,
+        traceId: request.id,
+      },
+    );
     switch (outcome.kind) {
       case "unauthenticated":
+        await recordAuthFailure(request);
         reply.header("www-authenticate", "Bearer");
         return fail(reply, 401, "UNAUTHENTICATED");
       case "agent_suspended":
@@ -169,7 +196,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
       case "idempotency_conflict":
         return fail(reply, 409, "IDEMPOTENCY_CONFLICT");
       case "rate_limited":
-        reply.header("retry-after", "30");
+        reply.header("retry-after", String(outcome.retryAfterSeconds));
         return fail(reply, 429, "RATE_LIMITED");
       case "decided":
         if (outcome.replay) reply.header("idempotent-replayed", "true");
@@ -196,6 +223,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
       );
       switch (outcome.kind) {
         case "unauthenticated":
+          await recordAuthFailure(request);
           reply.header("www-authenticate", "Bearer");
           return fail(reply, 401, "UNAUTHENTICATED");
         case "agent_suspended":

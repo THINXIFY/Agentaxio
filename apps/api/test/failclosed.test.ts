@@ -98,12 +98,16 @@ describe("S13 unavailable dependencies", () => {
     const dead = createPool("postgres://axo_agent_api:x@127.0.0.1:1/none", "dead");
     try {
       await expect(
-        submitActionRequest(dead, w.pepper, {
-          authorization: "Bearer axo_x",
-          idempotencyKey: idem(),
-          body: leadBody(),
-          traceId: "t",
-        }),
+        submitActionRequest(
+          dead,
+          { pepper: w.pepper, dataKeys: w.dataKeys },
+          {
+            authorization: `Bearer axo_${"0".repeat(24)}_${"A".repeat(43)}`,
+            idempotencyKey: idem(),
+            body: leadBody(),
+            traceId: "t",
+          },
+        ),
       ).rejects.toThrow();
     } finally {
       await dead.end();
@@ -225,13 +229,13 @@ describe("bounds on abuse", () => {
     const admin = await w.db.admin();
     await admin.query(
       `INSERT INTO axo.action_requests (organization_id, agent_id, environment_id, action_key, resource, request_key,
-         canonical_digest, canonical_parameters, status, originating_credential_id, expires_at)
-       SELECT $1, $2, $3, 'crm.lead.create', 'mockcrm/leads', 'filler-' || lpad(g::text, 12, '0'), repeat('c', 64), '{}',
+         canonical_digest, parameters_purged_at, status, originating_credential_id, expires_at)
+       SELECT $1, $2, $3, 'crm.lead.create', 'mockcrm/leads', 'filler-' || lpad(g::text, 12, '0'), repeat('c', 64), now(),
               'pending_approval', $4, now() + interval '10 minutes'
          FROM generate_series(1, 100) g`,
       [org.id, agent.agentId, org.dev, agent.credentialId],
     );
-    expect(await w.submit(agent.key, leadBody({ company: "Needs Review" }))).toEqual({
+    expect(await w.submit(agent.key, leadBody({ company: "Needs Review" }))).toMatchObject({
       kind: "rate_limited",
     });
     expect(await w.submit(agent.key, leadBody({ company: "Fine Ltd" }))).toMatchObject({

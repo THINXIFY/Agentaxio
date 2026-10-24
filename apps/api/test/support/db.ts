@@ -9,13 +9,14 @@ import { createPool } from "../../src/db/pool";
 export interface TestDatabase {
   name: string;
   /** Connection strings per role, each pointing at this test's own database. */
-  urls: { admin: string; migrator: string; agentApi: string; management: string };
+  urls: { admin: string; migrator: string; agentApi: string; management: string; executor: string };
   /** A superuser connection for fixtures and for tampering the tests need; never used by the code under test. */
   admin(): Promise<pg.Client>;
   /** Owner-role pool for provisioning. */
   migratorPool(): pg.Pool;
   agentPool(): pg.Pool;
   managementPool(): pg.Pool;
+  executorPool(): pg.Pool;
   drop(): Promise<void>;
 }
 
@@ -47,6 +48,7 @@ export async function createTestDatabase(
     migrator: withDatabase(cluster.adminUrl, name, "axo_migrator", cluster.roles.migrator),
     agentApi: withDatabase(cluster.adminUrl, name, "axo_agent_api", cluster.roles.agentApi),
     management: withDatabase(cluster.adminUrl, name, "axo_management", cluster.roles.management),
+    executor: withDatabase(cluster.adminUrl, name, "axo_executor", cluster.roles.executor),
   };
 
   const setup = new pg.Client({ connectionString: cluster.adminUrl });
@@ -97,6 +99,7 @@ export async function createTestDatabase(
     migratorPool: () => makePool(urls.migrator, "test-migrator"),
     agentPool: () => makePool(urls.agentApi, "test-agent-api"),
     managementPool: () => makePool(urls.management, "test-management"),
+    executorPool: () => makePool(urls.executor, "test-executor"),
     async drop() {
       for (const pool of pools) await pool.end().catch(() => undefined);
       for (const client of clients) await client.end().catch(() => undefined);

@@ -171,7 +171,9 @@
               "POLICY_CHANGED",
               "EVALUATOR_ERROR",
               "EXECUTION_FAILED",
-              "OUTCOME_UNKNOWN"
+              "OUTCOME_UNKNOWN",
+              "DIGEST_MISMATCH",
+              "GRANT_EXPIRED"
             ]
           }
         }
@@ -196,7 +198,10 @@
                   "UNSUPPORTED_MEDIA_TYPE",
                   "INVALID_REQUEST",
                   "RATE_LIMITED",
-                  "SERVICE_UNAVAILABLE"
+                  "SERVICE_UNAVAILABLE",
+                  "STEP_UP_REQUIRED",
+                  "CONFLICT",
+                  "EXPIRED"
                 ]
               },
               "message": { "type": "string" },

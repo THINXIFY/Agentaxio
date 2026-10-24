@@ -15,6 +15,7 @@ beforeAll(async () => {
   app = buildApp({
     agentPool: w.agentPool,
     pepper: w.pepper,
+    dataKeys: w.dataKeys,
     logger: { level: "debug", stream: { write: (line: string) => void logLines.push(line) } },
   });
   await app.ready();
@@ -202,8 +203,8 @@ describe("decisions over HTTP", () => {
     const admin = await w.db.admin();
     await admin.query(
       `INSERT INTO axo.action_requests (organization_id, agent_id, environment_id, action_key, resource, request_key,
-         canonical_digest, canonical_parameters, status, originating_credential_id, expires_at)
-       SELECT $1, $2, $3, 'crm.lead.create', 'mockcrm/leads', 'filler-' || lpad(g::text, 12, '0'), repeat('c', 64), '{}',
+         canonical_digest, parameters_purged_at, status, originating_credential_id, expires_at)
+       SELECT $1, $2, $3, 'crm.lead.create', 'mockcrm/leads', 'filler-' || lpad(g::text, 12, '0'), repeat('c', 64), now(),
               'pending_approval', $4, now() + interval '10 minutes' FROM generate_series(1, 100) g`,
       [org.id, agent.agentId, org.dev, agent.credentialId],
     );
@@ -384,7 +385,12 @@ describe("S15 secrets never reach the logs", () => {
 describe("S13 fail closed over HTTP", () => {
   it("answers 503 with a generic body, and nothing is authorized, when the database is unreachable", async () => {
     const dead = createPool("postgres://axo_agent_api:x@127.0.0.1:1/none", "dead");
-    const broken = buildApp({ agentPool: dead, pepper: w.pepper, logger: false });
+    const broken = buildApp({
+      agentPool: dead,
+      pepper: w.pepper,
+      dataKeys: w.dataKeys,
+      logger: false,
+    });
     try {
       const agent = await w.newAgent(w.orgA, w.orgA.dev);
       const res = await broken.inject({

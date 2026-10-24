@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { leadBody, idem, createWorld, type World } from "./support/world";
 import type { SubmitOutcome } from "../src/authorization/submit";
+import { decryptJson, parametersAad } from "../src/crypto/data-keys";
 
 let w: World;
 beforeAll(async () => {
@@ -263,10 +264,19 @@ describe("invalid input (S17)", () => {
     const out = decided(await w.submit(agent.key, leadBody({ company })));
     const admin = await w.db.admin();
     const stored = await admin.query(
-      "SELECT canonical_parameters->>'company' AS company FROM axo.action_requests WHERE id = $1",
+      "SELECT organization_id, canonical_digest, parameters_ciphertext, parameters_key_id FROM axo.action_requests WHERE id = $1",
       [out.id],
     );
-    expect(stored.rows[0]?.company).toBe(company);
+    const row = stored.rows[0];
+    // The stored value is ciphertext: the text is not readable in the database at all, and decrypts to exactly what was sent.
+    expect((row.parameters_ciphertext as Buffer).toString("latin1")).not.toContain("DROP TABLE");
+    const opened = decryptJson(
+      w.dataKeys,
+      row.parameters_ciphertext,
+      row.parameters_key_id,
+      parametersAad(row.organization_id, out.id, row.canonical_digest),
+    ) as Record<string, string>;
+    expect(opened.company).toBe(company);
   });
 });
 

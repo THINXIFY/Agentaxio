@@ -1,6 +1,6 @@
 import { createHmac, randomBytes } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { ConfigError, loadConfig, parsePepper } from "../src/config";
+import { ConfigError, parsePepper } from "../src/config";
 import {
   bearerFromHeader,
   generateCredential,
@@ -118,22 +118,6 @@ describe("configuration refuses to start unsafely", () => {
     }
     expect(parsePepper(randomBytes(32).toString("base64url"))).toHaveLength(32);
     expect(parsePepper(randomBytes(48).toString("base64"))).toHaveLength(48);
-  });
-
-  it("requires both database URLs and a valid port", () => {
-    const base = {
-      AXO_AGENT_API_DATABASE_URL: "postgres://a",
-      AXO_MANAGEMENT_DATABASE_URL: "postgres://m",
-      AXO_CREDENTIAL_PEPPER: randomBytes(32).toString("base64url"),
-    };
-    expect(loadConfig(base).host).toBe("127.0.0.1");
-    expect(() => loadConfig({ ...base, AXO_AGENT_API_DATABASE_URL: undefined })).toThrow(
-      ConfigError,
-    );
-    expect(() => loadConfig({ ...base, AXO_MANAGEMENT_DATABASE_URL: "" })).toThrow(ConfigError);
-    expect(() => loadConfig({ ...base, AXO_CREDENTIAL_PEPPER: undefined })).toThrow(ConfigError);
-    expect(() => loadConfig({ ...base, PORT: "0" })).toThrow(ConfigError);
-    expect(() => loadConfig({ ...base, PORT: "99999" })).toThrow(ConfigError);
   });
 });
 

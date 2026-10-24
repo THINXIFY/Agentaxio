@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { ACTION_REQUEST_STATUSES, ERROR_CODES, REASON_CODES } from "@agentaxio/contracts";
 import { buildApp } from "../src/http/app";
+import { parseKeyRing } from "../src/crypto/data-keys";
 import { createPool } from "../src/db/pool";
 
 interface OpenApi {
@@ -17,7 +18,17 @@ const spec = JSON.parse(
 describe("the OpenAPI document matches the running service", () => {
   it("documents exactly the routes that exist", async () => {
     const pool = createPool("postgres://unused@127.0.0.1:1/none", "openapi");
-    const app = buildApp({ agentPool: pool, pepper: Buffer.alloc(32, 1), logger: false });
+    const app = buildApp({
+      agentPool: pool,
+      pepper: Buffer.alloc(32, 1),
+      dataKeys: parseKeyRing(
+        JSON.stringify({
+          k: Buffer.from("0123456789abcdef0123456789abcdef").toString("base64url"),
+        }),
+        "k",
+      ),
+      logger: false,
+    });
     await app.ready();
     const actual = app.routeRegistry
       .map((r) => `${r.method} ${r.url.replace(/:(\w+)/g, "{$1}")}`)

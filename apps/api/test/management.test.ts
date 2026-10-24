@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   createPolicy,
@@ -10,6 +11,7 @@ import {
   revokeAgent,
   revokeCredential,
   suspendAgent,
+  withManagement,
   type ManagementContext,
 } from "../src/management";
 import { createWorld, idem, leadBody, type TestOrg, type World } from "./support/world";
@@ -80,9 +82,22 @@ describe("S16 role permissions are enforced by the database and surfaced as FORB
     await expect(w.manage(w.orgB.owner, org, async () => 1)).rejects.toMatchObject({
       code: "FORBIDDEN",
     });
-    await expect(w.manage("not-a-uuid", org, async () => 1)).rejects.toMatchObject({
-      code: "INVALID",
-    });
+    // No session, a malformed one, or a well-formed one the database never issued: not signed in.
+    for (const sessionToken of [undefined, "bogus", randomBytes(32).toString("base64url")]) {
+      await expect(
+        withManagement(w.managementPool, { sessionToken, organizationId: org.id }, async () => 1),
+      ).rejects.toMatchObject({ code: "UNAUTHENTICATED" });
+    }
+    await expect(
+      withManagement(
+        w.managementPool,
+        {
+          sessionToken: (await w.session(w.orgA.owner)).sessionToken,
+          organizationId: "not-a-uuid",
+        },
+        async () => 1,
+      ),
+    ).rejects.toMatchObject({ code: "INVALID" });
   });
 
   it("the database refuses the same writes even when the application guard is bypassed", async () => {
@@ -438,6 +453,7 @@ describe("S09 withdrawing access takes effect at the gate", () => {
         [id],
       );
       expect(a.rows.map((x) => x.event_type)).toEqual([
+        "approval.requested",
         "action_request.created",
         "decision.recorded",
         "action_request.cancelled",

@@ -1,3 +1,5 @@
+import { newToken } from "../auth/tokens";
+
 /**
  * Tenant provisioning: organizations, users, memberships and environments.
  *
@@ -62,4 +64,27 @@ export function provisionEnvironment(
     "INSERT INTO axo.environments (organization_id, name) VALUES ($1, $2) RETURNING id",
     [input.organizationId, input.name],
   );
+}
+
+/**
+ * Open a session for a user WITHOUT going through the identity provider. Owner-only, for the local seed script and the
+ * tests: no runtime role can do this, and the application never calls it. Returns the raw tokens (the session cookie
+ * value and the CSRF token) exactly as a real login would produce them.
+ */
+export async function provisionSession(
+  db: Queryable,
+  input: { userId: string; mfa?: boolean; authAgoSeconds?: number },
+): Promise<{ sessionToken: string; csrfToken: string }> {
+  const session = newToken();
+  const csrf = newToken();
+  const mfa = input.mfa ?? true;
+  await db.query(
+    `INSERT INTO axo.sessions (user_id, token_hash, csrf_hash, idle_expires_at, absolute_expires_at, auth_time, mfa_verified_at, amr)
+     VALUES ($1, $2, $3, now() + interval '30 minutes', now() + interval '12 hours',
+             now() - make_interval(secs => $4::integer),
+             CASE WHEN $5::boolean THEN now() - make_interval(secs => $4::integer) END,
+             CASE WHEN $5::boolean THEN ARRAY['pwd','otp'] ELSE ARRAY['pwd'] END)`,
+    [input.userId, session.hash, csrf.hash, input.authAgoSeconds ?? 0, mfa],
+  );
+  return { sessionToken: session.value, csrfToken: csrf.value };
 }

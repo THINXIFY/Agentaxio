@@ -1,12 +1,17 @@
-import { loadConfig } from "../config";
+import { loadAgentApiConfig } from "../config";
 import { createPool } from "../db/pool";
 import { buildApp } from "../http/app";
 
-/** Start the agent-facing API on loopback. Refuses to start without a valid configuration (including the pepper). */
+/** Start the agent-facing API on loopback. Refuses to start without a valid configuration (pepper and data keys). */
 async function main(): Promise<void> {
-  const config = loadConfig();
+  const config = loadAgentApiConfig();
   const agentPool = createPool(config.agentApiDatabaseUrl, "agent-api");
-  const app = buildApp({ agentPool, pepper: config.pepper, logger: { level: config.logLevel } });
+  const app = buildApp({
+    agentPool,
+    pepper: config.pepper,
+    dataKeys: config.dataKeys,
+    logger: { level: config.logLevel },
+  });
   const shutdown = () => {
     void app.close().then(() => agentPool.end());
   };

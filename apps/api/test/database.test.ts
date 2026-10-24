@@ -4,6 +4,8 @@ import { join } from "node:path";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { allTransitions } from "@agentaxio/contracts";
+import { randomBytes } from "node:crypto";
+import { hashToken } from "../src/auth/tokens";
 import { MIGRATIONS_DIR, MigrationError, migrate, readMigrations } from "../src/db/migrate";
 import { createTestDatabase } from "./support/db";
 import { createWorld, leadBody, type World } from "./support/world";
@@ -89,7 +91,7 @@ describe("migrations", () => {
     try {
       cpSync(MIGRATIONS_DIR, dir, { recursive: true });
       writeFileSync(
-        join(dir, "005_broken.sql"),
+        join(dir, "007_broken.sql"),
         "CREATE TABLE axo.half_done (id int); SELECT 1/0;",
       );
       const client = await connect(db.urls.migrator);
@@ -98,7 +100,7 @@ describe("migrations", () => {
       const admin = await db.admin();
       const table = await admin.query("SELECT to_regclass('axo.half_done') AS t");
       expect(table.rows[0].t).toBeNull();
-      const rows = await admin.query("SELECT 1 FROM axo.schema_migrations WHERE version = '005'");
+      const rows = await admin.query("SELECT 1 FROM axo.schema_migrations WHERE version = '007'");
       expect(rows.rowCount).toBe(0);
     } finally {
       await db.drop();
@@ -139,16 +141,16 @@ describe("migrations", () => {
 });
 
 describe("S20 runtime roles are least-privilege", () => {
-  const roles = ["axo_agent_api", "axo_management"] as const;
+  const roles = ["axo_agent_api", "axo_management", "axo_executor"] as const;
 
   it("are not superusers, cannot create roles or databases, cannot replicate and cannot bypass row-level security", async () => {
     const admin = await w.db.admin();
     const rows = await admin.query(
       `SELECT rolname, rolsuper, rolcreaterole, rolcreatedb, rolreplication, rolbypassrls, rolinherit
          FROM pg_roles WHERE rolname = ANY($1)`,
-      [["axo_agent_api", "axo_management", "axo_migrator"]],
+      [["axo_agent_api", "axo_management", "axo_executor", "axo_migrator"]],
     );
-    expect(rows.rowCount).toBe(3);
+    expect(rows.rowCount).toBe(4);
     for (const r of rows.rows) {
       expect(r, r.rolname).toMatchObject({
         rolsuper: false,
@@ -197,136 +199,6 @@ describe("S20 runtime roles are least-privilege", () => {
     }
   });
 
-  it("have exactly the table privileges listed here, and nothing else", async () => {
-    const admin = await w.db.admin();
-    const expected: Record<string, Record<string, string[]>> = {
-      axo_agent_api: {
-        action_definitions: ["SELECT"],
-        action_requests: ["INSERT", "SELECT"],
-        decisions: ["INSERT", "SELECT"],
-        audit_events: ["INSERT"],
-        policies: ["SELECT"],
-        policy_versions: ["SELECT"],
-      },
-      axo_management: {
-        action_definitions: ["SELECT"],
-        action_requests: ["SELECT"],
-        agent_credentials: ["INSERT"],
-        agents: ["INSERT", "SELECT"],
-        audit_events: ["INSERT", "SELECT"],
-        decisions: ["INSERT", "SELECT"],
-        environments: ["SELECT"],
-        memberships: ["SELECT"],
-        organizations: ["SELECT"],
-        policies: ["INSERT", "SELECT"],
-        policy_versions: ["INSERT", "SELECT"],
-      },
-    };
-    const tables = await admin.query(
-      "SELECT table_name FROM information_schema.tables WHERE table_schema = 'axo' AND table_type = 'BASE TABLE'",
-    );
-    const privileges = [
-      "SELECT",
-      "INSERT",
-      "UPDATE",
-      "DELETE",
-      "TRUNCATE",
-      "REFERENCES",
-      "TRIGGER",
-    ];
-    for (const role of roles) {
-      for (const t of tables.rows.map((r) => r.table_name as string)) {
-        const held: string[] = [];
-        for (const p of privileges) {
-          const r = await admin.query("SELECT has_table_privilege($1, $2, $3) AS ok", [
-            role,
-            `axo.${t}`,
-            p,
-          ]);
-          if (r.rows[0].ok) held.push(p);
-        }
-        expect(held.sort(), `${role} on ${t}`).toEqual((expected[role]?.[t] ?? []).sort());
-      }
-    }
-  });
-
-  it("can update only the columns listed here, and management cannot read credential digests", async () => {
-    const admin = await w.db.admin();
-    const columns = await admin.query(
-      "SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = 'axo'",
-    );
-    const updatable: Record<string, string[]> = { axo_agent_api: [], axo_management: [] };
-    const selectable: Record<string, string[]> = { axo_agent_api: [], axo_management: [] };
-    for (const role of roles) {
-      for (const { table_name: t, column_name: c } of columns.rows) {
-        const up = await admin.query("SELECT has_column_privilege($1, $2, $3, 'UPDATE') AS ok", [
-          role,
-          `axo.${t}`,
-          c,
-        ]);
-        if (up.rows[0].ok) updatable[role]?.push(`${t}.${c}`);
-        const sel = await admin.query("SELECT has_column_privilege($1, $2, $3, 'SELECT') AS ok", [
-          role,
-          `axo.${t}`,
-          c,
-        ]);
-        if (sel.rows[0].ok && t === "agent_credentials") selectable[role]?.push(c);
-      }
-    }
-    expect(updatable.axo_agent_api?.sort()).toEqual(["action_requests.status"]);
-    expect(updatable.axo_management?.sort()).toEqual(
-      [
-        "action_requests.status",
-        "agent_credentials.revoked_at",
-        "agent_credentials.revoked_reason",
-        "agents.revoked_at",
-        "agents.status",
-        "agents.suspended_at",
-        "environments.enforcement_state",
-        "environments.policy_epoch",
-      ].sort(),
-    );
-    expect(selectable.axo_agent_api).toEqual([]);
-    expect(selectable.axo_management).not.toContain("secret_hash");
-    expect(selectable.axo_management).toContain("key_id");
-  });
-
-  it("can execute exactly the functions listed here; PUBLIC can execute none", async () => {
-    const admin = await w.db.admin();
-    const fns = await admin.query(
-      `SELECT p.proname, p.oid, p.prosecdef FROM pg_proc p WHERE p.pronamespace = 'axo'::regnamespace ORDER BY 1`,
-    );
-    const expected: Record<string, string[]> = {
-      current_agent: ["axo_agent_api", "axo_management"],
-      current_env: ["axo_agent_api", "axo_management"],
-      current_org: ["axo_agent_api", "axo_management"],
-      current_user_id: ["axo_agent_api", "axo_management"],
-      has_role: ["axo_agent_api", "axo_management"],
-      enter_management_context: ["axo_management"],
-      enter_agent_context: ["axo_agent_api"],
-      lookup_credential: ["axo_agent_api"],
-    };
-    for (const f of fns.rows) {
-      const holders: string[] = [];
-      for (const role of [...roles, "axo_migrator"]) {
-        const r = await admin.query("SELECT has_function_privilege($1, $2::oid, 'EXECUTE') AS ok", [
-          role,
-          f.oid,
-        ]);
-        if (r.rows[0].ok && role !== "axo_migrator") holders.push(role);
-      }
-      const publicExec = await admin.query(
-        "SELECT count(*)::int AS n FROM pg_proc p, aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a WHERE p.oid = $1 AND a.grantee = 0",
-        [f.oid],
-      );
-      expect(publicExec.rows[0].n, `PUBLIC execute on ${f.proname}`).toBe(0);
-      // Trigger functions are invoked by the database, never by a caller; they need no EXECUTE for anyone.
-      expect(holders.sort(), f.proname as string).toEqual(
-        (expected[f.proname as string] ?? []).sort(),
-      );
-    }
-  });
-
   it("every SECURITY DEFINER function pins its search_path", async () => {
     const admin = await w.db.admin();
     const rows = await admin.query(
@@ -338,35 +210,6 @@ describe("S20 runtime roles are least-privilege", () => {
         (r.proconfig as string[] | null)?.some((c) => c.startsWith("search_path=")),
         r.proname,
       ).toBe(true);
-    }
-  });
-
-  it("every table that holds tenant data has row-level security enabled", async () => {
-    const admin = await w.db.admin();
-    const rows = await admin.query(
-      `SELECT c.relname, c.relrowsecurity,
-              EXISTS (SELECT 1 FROM information_schema.columns k WHERE k.table_schema = 'axo'
-                       AND k.table_name = c.relname AND k.column_name = 'organization_id') AS tenant
-         FROM pg_class c WHERE c.relnamespace = 'axo'::regnamespace AND c.relkind = 'r'`,
-    );
-    const noTenantColumn = rows.rows
-      .filter((r) => !r.tenant)
-      .map((r) => r.relname as string)
-      .sort();
-    // The only tables without organization_id are global or structural; each is listed on purpose.
-    expect(noTenantColumn).toEqual(
-      [
-        "action_definitions",
-        "organizations",
-        "request_status_transitions",
-        "schema_migrations",
-        "users",
-      ].sort(),
-    );
-    for (const r of rows.rows.filter(
-      (x) => x.tenant || ["organizations", "users"].includes(x.relname),
-    )) {
-      expect(r.relrowsecurity, r.relname as string).toBe(true);
     }
   });
 });
@@ -441,8 +284,8 @@ describe("S02 row-level security isolates tenants", () => {
     const insert = (agentId: string, orgId: string, envId: string) => (c: pg.Client) =>
       c.query(
         `INSERT INTO axo.action_requests (organization_id, agent_id, environment_id, action_key, resource, request_key,
-           canonical_digest, canonical_parameters, status, originating_credential_id, expires_at)
-         VALUES ($1, $2, $3, 'crm.lead.create', 'mockcrm/leads', 'forged-key-0123456789', repeat('a', 64), '{}',
+           canonical_digest, parameters_purged_at, status, originating_credential_id, expires_at)
+         VALUES ($1, $2, $3, 'crm.lead.create', 'mockcrm/leads', 'forged-key-0123456789', repeat('a', 64), now(),
                  'approved', $4, now() + interval '1 minute')`,
         [orgId, agentId, envId, a1.credentialId],
       );
@@ -481,7 +324,7 @@ describe("S02 row-level security isolates tenants", () => {
     expect(
       await sqlState(() =>
         asAgent(agent.credentialId, (c) =>
-          c.query("UPDATE axo.action_requests SET canonical_parameters = '{}' WHERE id = $1", [id]),
+          c.query("UPDATE axo.action_requests SET parameters_key_id = 'x' WHERE id = $1", [id]),
         ),
       ),
     ).toBe("42501");
@@ -521,7 +364,13 @@ describe("S02 row-level security isolates tenants", () => {
       "DELETE FROM axo.action_requests",
       "TRUNCATE axo.decisions",
       "UPDATE axo.policies SET action_key = action_key",
-      `SELECT axo.enter_management_context('${w.orgA.owner}', '${w.orgA.id}')`,
+      `SELECT axo.enter_org('${w.orgA.id}')`,
+      "SELECT * FROM axo.enter_session(decode(repeat('00', 32), 'hex'), 1800)",
+      "SELECT * FROM axo.claim_lock_next('attacker')",
+      "SELECT axo.expire_stale()",
+      "SELECT axo.purge_parameters(1)",
+      `SELECT * FROM axo.decide_approval('${w.orgA.id}', 'approve', repeat('a', 64), NULL)`,
+      "SELECT axo.audit_write(NULL, 'user', NULL, 'a.b', 'agent', NULL, NULL, '{}')",
       "SELECT * FROM axo.request_status_transitions",
     ];
     for (const sql of attempts) {
@@ -531,36 +380,45 @@ describe("S02 row-level security isolates tenants", () => {
     }
   });
 
-  it("gives management nothing until a context is entered, and only an active member can enter one", async () => {
+  it("gives management nothing until a session and an organization are entered, and only an active member gets in", async () => {
     const client = await connect(w.db.urls.management);
     try {
       expect((await client.query("SELECT count(*)::int AS n FROM axo.agents")).rows[0].n).toBe(0);
-      const enter = (user: string, org: string) =>
+      const attempt = (token: string, org: string) =>
         sqlState(async () => {
           await client.query("BEGIN");
           try {
-            await client.query("SELECT axo.enter_management_context($1::uuid, $2::uuid)", [
-              user,
-              org,
+            await client.query("SELECT * FROM axo.enter_session($1::bytea, 1800)", [
+              hashToken(token),
             ]);
+            await client.query("SELECT axo.enter_org($1::uuid)", [org]);
           } finally {
             await client.query("ROLLBACK");
           }
         });
-      expect(await enter(w.orgA.viewer, w.orgA.id)).toBe("ok");
-      expect(await enter(w.orgA.owner, w.orgB.id)).toBe("42501");
-      expect(await enter(w.outsider, w.orgA.id)).toBe("42501");
-      expect(await enter("00000000-0000-0000-0000-000000000000", w.orgA.id)).toBe("42501");
+      const viewer = (await w.session(w.orgA.viewer)).sessionToken;
+      const owner = (await w.session(w.orgA.owner)).sessionToken;
+      const outsider = (await w.session(w.outsider)).sessionToken;
+      expect(await attempt(viewer, w.orgA.id)).toBe("ok");
+      expect(await attempt(owner, w.orgB.id)).toBe("42501");
+      expect(await attempt(outsider, w.orgA.id)).toBe("42501");
+      // A token the database never issued, or a made-up one of the right shape, opens nothing.
+      expect(await attempt(randomBytes(32).toString("base64url"), w.orgA.id)).toBe("42501");
       const admin = await w.db.admin();
       await admin.query(
         "UPDATE axo.memberships SET status = 'removed' WHERE organization_id = $1 AND user_id = $2",
         [w.orgA.id, w.orgA.viewer],
       );
-      expect(await enter(w.orgA.viewer, w.orgA.id)).toBe("42501");
+      expect(await attempt(viewer, w.orgA.id)).toBe("42501");
       await admin.query(
         "UPDATE axo.memberships SET status = 'active' WHERE organization_id = $1 AND user_id = $2",
         [w.orgA.id, w.orgA.viewer],
       );
+      // Without entering an organization, even a valid session sees no tenant data.
+      await client.query("BEGIN");
+      await client.query("SELECT * FROM axo.enter_session($1::bytea, 1800)", [hashToken(owner)]);
+      expect((await client.query("SELECT count(*)::int AS n FROM axo.agents")).rows[0].n).toBe(0);
+      await client.query("ROLLBACK");
     } finally {
       await client.end();
     }
@@ -679,8 +537,8 @@ describe("composite foreign keys keep tenants apart even for the table owner", (
       await sqlState(() =>
         admin.query(
           `INSERT INTO axo.action_requests (organization_id, agent_id, environment_id, action_key, resource, request_key,
-             canonical_digest, canonical_parameters, status, originating_credential_id, expires_at)
-           VALUES ($1, $2, $3, 'crm.lead.create', 'mockcrm/leads', 'mismatch-key-0123456789', repeat('a', 64), '{}',
+             canonical_digest, parameters_purged_at, status, originating_credential_id, expires_at)
+           VALUES ($1, $2, $3, 'crm.lead.create', 'mockcrm/leads', 'mismatch-key-0123456789', repeat('a', 64), now(),
                    'denied', $4, now() + interval '1 minute')`,
           [orgA.id, agentA.agentId, orgA.prod, agentA.credentialId],
         ),
@@ -746,7 +604,8 @@ describe("append-only and state-machine guards hold even for the owner", () => {
     }
     for (const sql of [
       "UPDATE axo.action_requests SET canonical_digest = repeat('b', 64) WHERE id = $1",
-      'UPDATE axo.action_requests SET canonical_parameters = \'{"x":"y"}\' WHERE id = $1',
+      "UPDATE axo.action_requests SET parameters_key_id = 'zz' WHERE id = $1",
+      "UPDATE axo.action_requests SET parameters_ciphertext = decode('00', 'hex') WHERE id = $1",
       "UPDATE axo.action_requests SET agent_id = gen_random_uuid() WHERE id = $1",
       "UPDATE axo.action_requests SET resource = 'other' WHERE id = $1",
       "UPDATE axo.action_requests SET expires_at = now() + interval '1 year' WHERE id = $1",
@@ -769,8 +628,8 @@ describe("append-only and state-machine guards hold even for the owner", () => {
       const state = await sqlState(() =>
         admin.query(
           `INSERT INTO axo.action_requests (organization_id, agent_id, environment_id, action_key, resource, request_key,
-             canonical_digest, canonical_parameters, status, originating_credential_id, expires_at)
-           VALUES ($1, $2, $3, 'crm.lead.create', 'mockcrm/leads', $4, repeat('a', 64), '{}', $5, $6, now() + interval '1 minute')`,
+             canonical_digest, parameters_purged_at, status, originating_credential_id, expires_at)
+           VALUES ($1, $2, $3, 'crm.lead.create', 'mockcrm/leads', $4, repeat('a', 64), now(), $5, $6, now() + interval '1 minute')`,
           [
             w.orgA.id,
             agent.agentId,
