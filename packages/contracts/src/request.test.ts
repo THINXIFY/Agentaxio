@@ -169,6 +169,7 @@ describe("validateActionRequest: unknown action is a decision, not a validation 
       expect(validateActionRequest({ ...valid(), action })).toEqual({
         ok: false,
         kind: "unknown_action",
+        action,
       });
     }
   });

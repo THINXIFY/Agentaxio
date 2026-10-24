@@ -17,5 +17,15 @@ export default tseslint.config(
       "no-console": ["error", { allow: ["warn", "error"] }],
     },
   },
+  {
+    // Integration tests read untyped rows straight from PostgreSQL; production code stays fully strict.
+    files: ["test/**/*.ts"],
+    rules: {
+      "@typescript-eslint/no-unsafe-member-access": "off",
+      "@typescript-eslint/no-unsafe-assignment": "off",
+      "@typescript-eslint/no-unsafe-return": "off",
+      "@typescript-eslint/no-unsafe-argument": "off",
+    },
+  },
   { files: ["**/*.mjs"], ...tseslint.configs.disableTypeChecked },
 );

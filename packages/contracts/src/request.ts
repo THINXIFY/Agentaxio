@@ -43,7 +43,7 @@ export interface ValidatedActionRequest {
 export type ActionRequestValidation =
   | { ok: true; request: ValidatedActionRequest }
   | { ok: false; kind: "invalid"; issues: readonly string[] }
-  | { ok: false; kind: "unknown_action" };
+  | { ok: false; kind: "unknown_action"; action: string };
 
 /** Issue summaries carry a path and a code only, never a value, so personal data cannot leak into logs or audit. */
 function summarize(error: z.ZodError, prefix = ""): string[] {
@@ -69,7 +69,7 @@ function validate(input: unknown): ActionRequestValidation {
   if (!ACTION_KEY_PATTERN.test(action)) {
     return { ok: false, kind: "invalid", issues: ["action: invalid_format"] };
   }
-  if (!isActionKey(action)) return { ok: false, kind: "unknown_action" };
+  if (!isActionKey(action)) return { ok: false, kind: "unknown_action", action };
 
   const definition = ACTION_CATALOG[action];
   if (resource !== definition.resource) {
