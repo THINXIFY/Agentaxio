@@ -26,6 +26,14 @@ describe("policy condition grammar", () => {
     ).toBe(true);
   });
 
+  it("rejects prototype-named fields as unknown", () => {
+    for (const field of ["constructor", "toString", "hasOwnProperty", "valueOf"]) {
+      expect(ok("crm.lead.create", { all: [{ field, op: "eq", value: "x" }] }).ok, field).toBe(
+        false,
+      );
+    }
+  });
+
   it("rejects an unknown action", () => {
     expect(ok("crm.nothing.create", { all: [] })).toEqual({
       ok: false,

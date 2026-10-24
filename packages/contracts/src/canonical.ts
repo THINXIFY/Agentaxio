@@ -28,6 +28,10 @@ export function canonicalJson(value: unknown, depth = 0): string {
       return JSON.stringify(value);
     case "object": {
       if (Array.isArray(value)) {
+        // Holes and extra named properties would be dropped or written as invalid JSON, so refuse them.
+        if (Object.keys(value).length !== value.length) {
+          throw new TypeError("canonicalJson: sparse array or array with extra properties");
+        }
         return `[${value.map((v) => canonicalJson(v, depth + 1)).join(",")}]`;
       }
       if (!isPlainObject(value)) throw new TypeError("canonicalJson: unsupported object type");

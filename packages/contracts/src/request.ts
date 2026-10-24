@@ -20,10 +20,18 @@ import {
 const envelope = z.strictObject({
   action: z.string().max(ACTION_KEY_MAX_LENGTH),
   resource: z.string().max(128),
-  parameters: z.custom<Record<string, unknown>>(
-    (v) => typeof v === "object" && v !== null && !Array.isArray(v),
-  ),
+  parameters: z.custom<Record<string, unknown>>(isPlainRecord),
 });
+
+/**
+ * Only plain objects (as JSON.parse produces) are accepted, never class instances, Maps or objects that inherit
+ * properties from a custom prototype: an inherited value would be read as if the caller had sent it.
+ */
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  const proto = Object.getPrototypeOf(value) as unknown;
+  return proto === Object.prototype || proto === null;
+}
 
 export interface ValidatedActionRequest {
   action: ActionKey;
@@ -42,7 +50,18 @@ function summarize(error: z.ZodError, prefix = ""): string[] {
   return error.issues.map((i) => `${prefix}${i.path.join(".") || "(root)"}: ${i.code}`);
 }
 
+/** Never throws: anything that cannot be validated (including hostile objects) is simply invalid. */
 export function validateActionRequest(input: unknown): ActionRequestValidation {
+  try {
+    return validate(input);
+  } catch {
+    return { ok: false, kind: "invalid", issues: ["(root): validation_error"] };
+  }
+}
+
+function validate(input: unknown): ActionRequestValidation {
+  if (!isPlainRecord(input))
+    return { ok: false, kind: "invalid", issues: ["(root): invalid_type"] };
   const parsed = envelope.safeParse(input);
   if (!parsed.success) return { ok: false, kind: "invalid", issues: summarize(parsed.error) };
 

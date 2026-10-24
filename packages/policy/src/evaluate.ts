@@ -1,5 +1,7 @@
 import {
   PolicyVersionSchema,
+  isActionKey,
+  validatePolicyForAction,
   type PolicyEffect,
   type PolicyCondition,
   type PolicyVersion,
@@ -79,6 +81,8 @@ function evaluate(input: EvaluationInput): PolicyDecision {
   const agentId = requireText(input.principal.agentId);
   const environmentId = requireText(input.principal.environmentId);
   const action = requireText(input.action);
+  // Only catalog actions can be decided. A leftover policy for a retired action must never turn into an allow.
+  if (!isActionKey(action)) throw new Error("action is not in the catalog");
   if (!(input.now instanceof Date) || Number.isNaN(input.now.getTime())) {
     throw new TypeError("invalid time");
   }
@@ -89,6 +93,8 @@ function evaluate(input: EvaluationInput): PolicyDecision {
   if (!Array.isArray(input.policies)) throw new TypeError("invalid policy list");
 
   const matched: PolicyVersion[] = [];
+  const seenVersionIds = new Set<string>();
+  const seenPolicyIds = new Set<string>();
   for (const raw of input.policies as unknown[]) {
     if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
       throw new TypeError("malformed policy");
@@ -101,6 +107,16 @@ function evaluate(input: EvaluationInput): PolicyDecision {
     const policy = PolicyVersionSchema.parse(raw);
     if (policy.organizationId !== organizationId)
       throw new Error("policy from another organization");
+    // Defence in depth for write-time validation: fields and operators must be on the action's allowlist.
+    if (!validatePolicyForAction(policy.actionKey, policy.conditions).ok) {
+      throw new Error("policy conditions are not valid for the action");
+    }
+    // One version per policy: two versions of the same policy, or one id twice, is conflicting configuration.
+    if (seenVersionIds.has(policy.id) || seenPolicyIds.has(policy.policyId)) {
+      throw new Error("conflicting policy versions");
+    }
+    seenVersionIds.add(policy.id);
+    seenPolicyIds.add(policy.policyId);
     if (!policy.enabled) continue;
     if (policy.environmentId !== null && policy.environmentId !== environmentId) continue;
     if (policy.agentId !== null && policy.agentId !== agentId) continue;

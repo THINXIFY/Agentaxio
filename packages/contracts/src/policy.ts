@@ -81,7 +81,8 @@ export function validatePolicyForAction(
   const fields: Readonly<Record<string, string>> = ACTION_CATALOG[actionKey].fields;
   const issues: string[] = [];
   parsed.data.all.forEach((c, index) => {
-    const kind = fields[c.field];
+    // Own properties only: "constructor" and "toString" must not pass as fields of the action.
+    const kind = Object.hasOwn(fields, c.field) ? fields[c.field] : undefined;
     if (kind === undefined) issues.push(`conditions.all.${String(index)}.field: unknown_field`);
     else if (c.op === "email_domain_in" && kind !== "email") {
       issues.push(`conditions.all.${String(index)}.op: not_applicable_to_field`);

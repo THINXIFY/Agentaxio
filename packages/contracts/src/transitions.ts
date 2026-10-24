@@ -30,12 +30,21 @@ export const TERMINAL_STATUSES = (Object.keys(TRANSITIONS) as ActionRequestStatu
   (s) => TRANSITIONS[s].length === 0,
 );
 
+/**
+ * Statuses arrive from the database as plain strings, so look them up as own properties only: "constructor" or
+ * "toString" must not resolve to a function on the prototype. An unrecognised status has no successors, which makes
+ * every transition from it illegal and treats it as terminal (fail closed).
+ */
+function successors(status: string): readonly string[] {
+  return Object.hasOwn(TRANSITIONS, status) ? TRANSITIONS[status as ActionRequestStatus] : [];
+}
+
 export function canTransition(from: ActionRequestStatus, to: ActionRequestStatus): boolean {
-  return TRANSITIONS[from].includes(to);
+  return successors(from).includes(to);
 }
 
 export function isTerminal(status: ActionRequestStatus): boolean {
-  return TRANSITIONS[status].length === 0;
+  return successors(status).length === 0;
 }
 
 /** Every legal (from, to) pair, for generating the database CHECK constraint and for tests. */
