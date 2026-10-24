@@ -457,6 +457,8 @@ Slices are small, reviewable pull requests, each with its threat impact and the 
 | B4 | `POST/GET /v1/action-requests`, idempotency, state transitions to `denied` / `pending_approval` / `queued_execution`, audit in-transaction, fail-closed 503 | S01–S05, S12, S13, S17, S19 |
 | B5 | Negative-suite completion (≥20 abuse cases), OpenAPI document, threat note listing M02 blockers | M01 definition of done; **review gate** |
 
+**Progress:** B0 done (`d9a2ecd`). B1 done: closed vocabularies and state machine, strict `crm.lead.create` schema, canonical JSON and digest, policy condition grammar (`packages/contracts`), and the pure `evaluatePolicy` (`packages/policy`) with 82 unit and property tests. B2 onward not started.
+
 Agents and policies are created by a **local seed/CLI script** in M01 (no management API, no human sessions).
 
 **M02 — Humans, approvals, grants, trusted mock executor** (blocked on Q3)
