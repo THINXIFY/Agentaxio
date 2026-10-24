@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
-import { createServer, type Server } from "node:http";
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { SignJWT, exportJWK, generateKeyPair, type JWK } from "jose";
 
 /**
@@ -119,13 +119,13 @@ export class TestIdp {
     }
   }
 
-  private async readForm(request: import("node:http").IncomingMessage): Promise<URLSearchParams> {
+  private async readForm(request: IncomingMessage): Promise<URLSearchParams> {
     const chunks: Buffer[] = [];
     for await (const chunk of request) chunks.push(chunk as Buffer);
     return new URLSearchParams(Buffer.concat(chunks).toString("utf8"));
   }
 
-  private json(response: import("node:http").ServerResponse, status: number, body: unknown) {
+  private json(response: ServerResponse, status: number, body: unknown) {
     response.writeHead(status, { "content-type": "application/json", "cache-control": "no-store" });
     response.end(JSON.stringify(body));
   }
@@ -134,8 +134,8 @@ export class TestIdp {
     rawUrl: string,
     method: string,
     authorization: string | undefined,
-    request: import("node:http").IncomingMessage,
-    response: import("node:http").ServerResponse,
+    request: IncomingMessage,
+    response: ServerResponse,
   ): Promise<void> {
     const url = new URL(rawUrl, this.url);
     if (url.pathname === "/.well-known/openid-configuration") {

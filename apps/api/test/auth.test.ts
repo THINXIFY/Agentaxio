@@ -3,7 +3,7 @@ import { hashToken } from "../src/auth/tokens";
 import { isMultiFactor } from "../src/auth/oidc";
 import { safeReturnTo } from "../src/auth/login";
 import {
-  Browser,
+  type Browser,
   COOKIE,
   WEB_ORIGIN,
   createHumanWorld,

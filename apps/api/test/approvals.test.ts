@@ -9,7 +9,6 @@ import {
   registerAgent,
   reviewApproval,
   suspendAgent,
-  withManagement,
 } from "../src/management";
 import { getActionRequestStatus } from "../src/authorization/status";
 import { createHumanWorld, newUser, type Browser, type HumanWorld } from "./support/human";
@@ -918,5 +917,3 @@ describe("the decision over HTTP", () => {
     expect(statuses.slice(0, 30).every((x) => x !== 429)).toBe(true);
   });
 });
-
-void withManagement;

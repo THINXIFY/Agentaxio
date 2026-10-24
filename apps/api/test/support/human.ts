@@ -30,6 +30,7 @@ export interface Response {
   status: number;
   headers: Record<string, string | string[] | number | undefined>;
   body: string;
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
   json<T = Record<string, unknown>>(): T;
 }
 
@@ -107,6 +108,7 @@ export class Browser {
       status: res.statusCode,
       headers: res.headers,
       body: res.body,
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
       json: <T = Record<string, unknown>>() => JSON.parse(res.body) as T,
     };
   }

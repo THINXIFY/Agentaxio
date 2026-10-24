@@ -49,18 +49,19 @@ export interface MockCrm {
 }
 
 const MAX_BODY = 4 * 1024;
-const TEXT = /^[^\u0000-\u001f\u007f]{1,120}$/u;
+const TEXT = /^[^\p{Cc}]{1,120}$/u;
 const EMAIL = /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{1,63}$/;
 
-function readBody(request: IncomingMessage): Promise<string | "too-large"> {
+/** The body as text, or null when it is larger than allowed (the rest is read and thrown away). */
+function readBody(request: IncomingMessage): Promise<string | null> {
   return new Promise((resolve, reject) => {
     let size = 0;
     const chunks: Buffer[] = [];
     request.on("data", (chunk: Buffer) => {
       size += chunk.length;
       if (size > MAX_BODY) {
-        request.destroy();
-        resolve("too-large");
+        chunks.length = 0;
+        resolve(null);
         return;
       }
       chunks.push(chunk);
@@ -74,7 +75,11 @@ function readBody(request: IncomingMessage): Promise<string | "too-large"> {
 
 function send(response: ServerResponse, status: number, body: unknown): void {
   const text = JSON.stringify(body);
-  response.writeHead(status, { "content-type": "application/json", "content-length": Buffer.byteLength(text), "cache-control": "no-store" });
+  response.writeHead(status, {
+    "content-type": "application/json",
+    "content-length": Buffer.byteLength(text),
+    "cache-control": "no-store",
+  });
   response.end(text);
 }
 
@@ -122,7 +127,7 @@ export function createMockCrm(options: MockCrmOptions): MockCrm {
           return;
         }
         const raw = await readBody(request);
-        if (raw === "too-large") {
+        if (raw === null) {
           send(response, 413, { error: "too large" });
           return;
         }
@@ -142,9 +147,12 @@ export function createMockCrm(options: MockCrmOptions): MockCrm {
         const { full_name: name, email, company } = body;
         if (
           keys !== "company,email,full_name" ||
-          typeof name !== "string" || !TEXT.test(name) ||
-          typeof company !== "string" || !TEXT.test(company) ||
-          typeof email !== "string" || !EMAIL.test(email)
+          typeof name !== "string" ||
+          !TEXT.test(name) ||
+          typeof company !== "string" ||
+          !TEXT.test(company) ||
+          typeof email !== "string" ||
+          !EMAIL.test(email)
         ) {
           send(response, 422, { error: "invalid lead" });
           return;
@@ -159,7 +167,12 @@ export function createMockCrm(options: MockCrmOptions): MockCrm {
           send(response, 200, { id: existing.lead.id });
           return;
         }
-        const lead: Lead = { id: `lead_${randomBytes(8).toString("hex")}`, full_name: name, email, company };
+        const lead: Lead = {
+          id: `lead_${randomBytes(8).toString("hex")}`,
+          full_name: name,
+          email,
+          company,
+        };
         byKey.set(key, { lead, fingerprint });
         if (faults.dropAfterCreate === true) {
           request.socket.destroy();

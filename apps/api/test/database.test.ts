@@ -59,7 +59,7 @@ describe("migrations", () => {
   it("refuse to run when an applied migration was edited afterwards", async () => {
     const db = await createTestDatabase();
     try {
-      const admin = await db.admin();
+      const admin = await db.adminDedicated();
       await admin.query(
         "UPDATE axo.schema_migrations SET checksum = repeat('0', 64) WHERE version = '002'",
       );
@@ -97,7 +97,7 @@ describe("migrations", () => {
       const client = await connect(db.urls.migrator);
       await expect(migrate(client, dir)).rejects.toThrow();
       await client.end();
-      const admin = await db.admin();
+      const admin = await db.adminDedicated();
       const table = await admin.query("SELECT to_regclass('axo.half_done') AS t");
       expect(table.rows[0].t).toBeNull();
       const rows = await admin.query("SELECT 1 FROM axo.schema_migrations WHERE version = '007'");
@@ -119,7 +119,7 @@ describe("migrations", () => {
           .map((m) => m.name)
           .sort(),
       );
-      const admin = await db.admin();
+      const admin = await db.adminDedicated();
       const rows = await admin.query("SELECT count(*)::int AS n FROM axo.schema_migrations");
       expect(rows.rows[0].n).toBe(readMigrations().length);
     } finally {
@@ -128,7 +128,7 @@ describe("migrations", () => {
   });
 
   it("keep the database state machine identical to the code state machine", async () => {
-    const admin = await w.db.admin();
+    const admin = await w.db.adminDedicated();
     const rows = await admin.query(
       "SELECT from_status, to_status FROM axo.request_status_transitions",
     );
@@ -144,7 +144,7 @@ describe("S20 runtime roles are least-privilege", () => {
   const roles = ["axo_agent_api", "axo_management", "axo_executor"] as const;
 
   it("are not superusers, cannot create roles or databases, cannot replicate and cannot bypass row-level security", async () => {
-    const admin = await w.db.admin();
+    const admin = await w.db.adminDedicated();
     const rows = await admin.query(
       `SELECT rolname, rolsuper, rolcreaterole, rolcreatedb, rolreplication, rolbypassrls, rolinherit
          FROM pg_roles WHERE rolname = ANY($1)`,
@@ -164,7 +164,7 @@ describe("S20 runtime roles are least-privilege", () => {
   });
 
   it("own nothing and belong to no other role", async () => {
-    const admin = await w.db.admin();
+    const admin = await w.db.adminDedicated();
     const owned = await admin.query(
       `SELECT c.relname FROM pg_class c JOIN pg_roles r ON r.oid = c.relowner
         WHERE c.relnamespace = 'axo'::regnamespace AND r.rolname = ANY($1)`,
@@ -200,7 +200,7 @@ describe("S20 runtime roles are least-privilege", () => {
   });
 
   it("every SECURITY DEFINER function pins its search_path", async () => {
-    const admin = await w.db.admin();
+    const admin = await w.db.adminDedicated();
     const rows = await admin.query(
       `SELECT proname, proconfig FROM pg_proc WHERE pronamespace = 'axo'::regnamespace AND prosecdef`,
     );
@@ -329,7 +329,7 @@ describe("S02 row-level security isolates tenants", () => {
       ),
     ).toBe("42501");
     // Forcing a status the policy does not allow fails the WITH CHECK, even for an approved row.
-    const admin = await w.db.admin();
+    const admin = await w.db.adminDedicated();
     await admin.query(
       "ALTER TABLE axo.action_requests DISABLE TRIGGER action_requests_update_guard",
     );
@@ -404,7 +404,7 @@ describe("S02 row-level security isolates tenants", () => {
       expect(await attempt(outsider, w.orgA.id)).toBe("42501");
       // A token the database never issued, or a made-up one of the right shape, opens nothing.
       expect(await attempt(randomBytes(32).toString("base64url"), w.orgA.id)).toBe("42501");
-      const admin = await w.db.admin();
+      const admin = await w.db.adminDedicated();
       await admin.query(
         "UPDATE axo.memberships SET status = 'removed' WHERE organization_id = $1 AND user_id = $2",
         [w.orgA.id, w.orgA.viewer],
@@ -502,7 +502,7 @@ describe("S02 row-level security isolates tenants", () => {
 describe("composite foreign keys keep tenants apart even for the table owner", () => {
   it("rejects a cross-organization reference of every kind", async () => {
     const orgA = await w.freshOrg();
-    const admin = await w.db.admin();
+    const admin = await w.db.adminDedicated();
     const agentA = await w.newAgent(orgA, orgA.dev);
     const agentB = await w.newAgent(w.orgB, w.orgB.dev);
     const insertAgent = (org: string, env: string, owner: string) =>
@@ -616,7 +616,7 @@ describe("append-only and state-machine guards hold even for the owner", () => {
 
   it("does not let a request be created straight into an executing or finished state", async () => {
     const agent = await w.newAgent(w.orgA, w.orgA.dev);
-    const admin = await w.db.admin();
+    const admin = await w.db.adminDedicated();
     for (const status of [
       "queued_execution",
       "running",
