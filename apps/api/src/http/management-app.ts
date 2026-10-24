@@ -750,6 +750,12 @@ export function buildManagementApp(deps: ManagementAppDeps): FastifyInstance {
             detail:
               "You cannot decide a request from an agent you own, registered, or issued the key for.",
           });
+        case "policy_author":
+          return fail(reply, 403, "FORBIDDEN", {
+            reason: "POLICY_AUTHOR",
+            detail:
+              "You wrote a rule that applies to this request, so someone else has to decide it.",
+          });
         case "digest_mismatch":
           return fail(reply, 409, "CONFLICT", {
             reason: "DIGEST_MISMATCH",

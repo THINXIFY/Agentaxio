@@ -3,6 +3,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { provisionMembership, provisionUser } from "../src/db/provision";
 import { maintain } from "../src/executor/executor";
 import {
+  createPolicy,
+  createPolicyVersion,
   decideApproval,
   issueCredential,
   listApprovals,
@@ -915,5 +917,87 @@ describe("the decision over HTTP", () => {
       );
     expect(statuses.filter((x) => x === 429).length).toBeGreaterThanOrEqual(2);
     expect(statuses.slice(0, 30).every((x) => x !== 429)).toBe(true);
+  });
+});
+
+describe("separation of duties between rule writers and approvers", () => {
+  const rule = { actionKey: "crm.lead.create", conditions: { all: [] } } as const;
+
+  it("refuses a person who wrote a rule that applies to the request, and records the attempt", async () => {
+    const org = await w().freshOrg();
+    const author = await member(org, "admin"); // can write rules AND is allowed to approve
+    const p = await pendingRequest(org); // the rule that sent it to review was written by org.admin
+    await w().manage(author, org, (c) =>
+      createPolicy(c, { ...rule, effect: "allow", agentId: p.agent.agentId, enabled: false }),
+    );
+    for (const decision of ["approve", "reject"] as const) {
+      expect((await decide(org, author, p.approvalId, decision, p.digest)).outcome, decision).toBe(
+        "policy_author",
+      );
+    }
+    const admin = await w().db.admin();
+    expect(
+      (await admin.query("SELECT state FROM axo.approval_requests WHERE id = $1", [p.approvalId]))
+        .rows[0].state,
+    ).toBe("pending");
+    expect(
+      (
+        await admin.query(
+          "SELECT count(*)::int AS n FROM axo.audit_events WHERE request_id = $1 AND event_type = 'approval.policy_author_blocked'",
+          [p.requestId],
+        )
+      ).rows[0].n,
+    ).toBe(2);
+    expect((await decide(org, org.approver, p.approvalId, "approve", p.digest)).outcome).toBe(
+      "approved",
+    );
+  });
+
+  it("also counts later revisions: whoever last touched an applicable rule cannot approve", async () => {
+    const org = await w().freshOrg();
+    const reviser = await member(org, "admin");
+    const p = await pendingRequest(org);
+    const rules = await (
+      await w().db.admin()
+    ).query(
+      "SELECT pol.id, v.version FROM axo.policies pol JOIN axo.policy_versions v ON v.policy_id = pol.id WHERE pol.agent_id = $1",
+      [p.agent.agentId],
+    );
+    const first = rules.rows[0] as { id: string; version: number };
+    await w().manage(reviser, org, (c) =>
+      createPolicyVersion(c, {
+        policyId: first.id,
+        expectedVersion: first.version,
+        effect: "require_approval",
+        conditions: { all: [] },
+      }),
+    );
+    expect((await decide(org, reviser, p.approvalId, "approve", p.digest)).outcome).toBe(
+      "policy_author",
+    );
+  });
+
+  it("does not over-reach: rules for another agent or another environment do not block", async () => {
+    const org = await w().freshOrg();
+    const p = await pendingRequest(org);
+    const writer = await member(org, "admin");
+    const otherAgent = await w().newAgent(org, org.dev);
+    await w().manage(writer, org, (c) =>
+      createPolicy(c, { ...rule, effect: "allow", agentId: otherAgent.agentId }),
+    );
+    await w().manage(writer, org, (c) =>
+      createPolicy(c, { ...rule, effect: "allow", environmentId: org.prod }),
+    );
+    expect((await decide(org, writer, p.approvalId, "approve", p.digest)).outcome).toBe("approved");
+  });
+
+  it("blocks a writer of an organization-wide rule for every agent in the organization", async () => {
+    const org = await w().freshOrg();
+    const writer = await member(org, "owner");
+    await w().manage(writer, org, (c) => createPolicy(c, { ...rule, effect: "require_approval" }));
+    const p = await pendingRequest(org);
+    expect((await decide(org, writer, p.approvalId, "approve", p.digest)).outcome).toBe(
+      "policy_author",
+    );
   });
 });

@@ -76,5 +76,5 @@ For a persistent local database use `pnpm --filter @agentaxio/api db:setup`, `db
 - Keys live in the process environment; a key-management service is a hosting decision.
 - No email: invitation tokens are shown once to the inviter. No screens yet for invitations, role changes, organization switching, billing, settings or integrations (they stay labelled).
 - Agents can create a lead only in the mock CRM. n8n and other tools are not connected; only calls to the AgentAxio API are controlled.
-- Resuming a suspended agent or halted environment does not require fresh MFA (stopping must never be gated, resuming probably should be).
+- A single owner or admin can still loosen a rule (for example to "allowed"); it is audited and needs fresh MFA but not a second person (see D6).
 - No independent security review and no load testing.

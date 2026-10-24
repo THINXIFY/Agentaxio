@@ -68,6 +68,7 @@ export const APPROVAL_OUTCOMES = [
   "already_decided",
   "not_pending",
   "self_approval",
+  "policy_author",
   "digest_mismatch",
 ] as const;
 export type ApprovalOutcome = (typeof APPROVAL_OUTCOMES)[number];

@@ -330,6 +330,19 @@ describe("S11 everything is re-checked at the moment of execution", () => {
     });
   });
 
+  it("has no separate epoch comparison: the claim takes only the re-evaluated rule result and the digest check", async () => {
+    // The old five-argument form (with a policy epoch the executor read itself) is gone; only the exact rules decide.
+    await expect(
+      pool.query(
+        "SELECT * FROM axo.claim_finish(gen_random_uuid(), 'x', 'allow', 1::bigint, true)",
+      ),
+    ).rejects.toMatchObject({ code: "42883" });
+    // Wrong or unknown inputs are refused rather than treated as success.
+    await expect(
+      pool.query("SELECT * FROM axo.claim_finish(gen_random_uuid(), 'x', 'allow', true)"),
+    ).resolves.toMatchObject({ rows: [{ outcome: "gone" }] });
+  });
+
   it("withdraws a queued request when the agent is suspended, its key revoked, or its environment halted", async () => {
     await drain();
     const org = await w.freshOrg();
@@ -628,8 +641,8 @@ describe("S12 authorized is not executed, and what happened is recorded honestly
       if (row === undefined) throw new Error("nothing to claim");
       const finished = (
         await client.query<{ outcome: string; attempt_id: string }>(
-          "SELECT * FROM axo.claim_finish($1::uuid, $2, 'allow', $3::bigint, true)",
-          [row.grant_id, "doomed-executor", row.policy_epoch],
+          "SELECT * FROM axo.claim_finish($1::uuid, $2, 'allow', true)",
+          [row.grant_id, "doomed-executor"],
         )
       ).rows[0];
       attemptId = finished?.attempt_id ?? "";

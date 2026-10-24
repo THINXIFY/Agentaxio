@@ -1,6 +1,6 @@
 import { recordAudit } from "../audit";
 import { conflict, invalid, notFound } from "../errors";
-import { assertUuid, requireAdmin, type ManagementContext } from "./context";
+import { assertUuid, requireAdmin, requireStepUp, type ManagementContext } from "./context";
 import { cancelInFlightRequests } from "./cancel";
 
 /**
@@ -89,11 +89,13 @@ export async function suspendAgent(
   return { cancelledRequests };
 }
 
+/** Switching an agent back on is sensitive (it lets a stopped agent act again), so it needs a fresh multi-factor sign-in. Stopping never does. */
 export async function resumeAgent(
   context: ManagementContext,
   input: { agentId: string },
 ): Promise<void> {
   requireAdmin(context);
+  requireStepUp(context);
   assertUuid(input.agentId, "agent id");
   const updated = await context.tx.query(
     "UPDATE axo.agents SET status = 'active', suspended_at = NULL WHERE id = $1 AND status = 'suspended'",

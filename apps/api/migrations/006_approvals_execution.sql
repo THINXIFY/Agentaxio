@@ -373,6 +373,21 @@ BEGIN
     RETURN QUERY SELECT 'self_approval'::text, r.status; RETURN;
   END IF;
 
+  -- Separation of duties (D6): whoever wrote any version of a rule that applies to this request (same action, and the
+  -- rule covers this agent and this environment) cannot approve it. Otherwise one person could write the rule that
+  -- sends requests to review, loosen or reshape it, and then wave the results through.
+  IF EXISTS (
+    SELECT 1 FROM axo.policy_versions v
+      JOIN axo.policies p ON p.organization_id = v.organization_id AND p.id = v.policy_id
+     WHERE p.organization_id = v_org AND p.action_key = r.action_key
+       AND (p.agent_id IS NULL OR p.agent_id = r.agent_id)
+       AND (p.environment_id IS NULL OR p.environment_id = r.environment_id)
+       AND v.created_by_user_id = v_user
+  ) THEN
+    PERFORM axo.audit_write(v_org, 'user', v_user, 'approval.policy_author_blocked', 'approval', ap.id, r.id, '{}');
+    RETURN QUERY SELECT 'policy_author'::text, r.status; RETURN;
+  END IF;
+
   -- The reviewer must have seen exactly what is stored (S06).
   IF p_reviewed_digest <> r.canonical_digest OR p_reviewed_digest <> ap.requested_digest THEN
     PERFORM axo.audit_write(v_org, 'user', v_user, 'approval.digest_mismatch', 'approval', ap.id, r.id, '{}');
@@ -492,7 +507,7 @@ $$;
 -- executor's code (the same pure evaluator as the agent API); EVERYTHING ELSE is re-read here. Either the grant is
 -- consumed and an attempt starts (all atomically), or the grant is invalidated and the request is closed with the
 -- reason. A grant is therefore used at most once, and a stale approval cannot execute.
-CREATE FUNCTION axo.claim_finish(p_grant uuid, p_executor text, p_policy_result text, p_policy_epoch bigint, p_digest_ok boolean)
+CREATE FUNCTION axo.claim_finish(p_grant uuid, p_executor text, p_policy_result text, p_digest_ok boolean)
   RETURNS TABLE (outcome text, attempt_id uuid, reason_code text)
   LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $$
 DECLARE
@@ -530,7 +545,6 @@ BEGIN
   ELSIF v_agent IS DISTINCT FROM 'active' THEN v_reason := 'AGENT_SUSPENDED'; v_basis := 'agent_suspended';
   ELSIF v_cred IS DISTINCT FROM 'usable' THEN v_reason := 'CREDENTIAL_REVOKED'; v_basis := 'credential_revoked';
   ELSIF v_env_state IS DISTINCT FROM 'active' THEN v_reason := 'ENVIRONMENT_HALTED'; v_basis := 'environment_halted';
-  ELSIF p_policy_epoch IS DISTINCT FROM v_epoch THEN v_reason := 'POLICY_CHANGED'; v_basis := 'policy_changed';
   ELSIF ap.id IS NOT NULL AND (ap.state <> 'approved' OR ap.reviewed_digest IS DISTINCT FROM r.canonical_digest) THEN
     v_reason := 'APPROVAL_DENIED'; v_basis := 'approval_rejected';
   ELSIF p_policy_result = 'error' THEN v_reason := 'EVALUATOR_ERROR'; v_basis := 'evaluator_error';
@@ -685,7 +699,7 @@ GRANT EXECUTE ON FUNCTION
   TO axo_management;
 GRANT EXECUTE ON FUNCTION
   axo.claim_lock_next(text),
-  axo.claim_finish(uuid, text, text, bigint, boolean),
+  axo.claim_finish(uuid, text, text, boolean),
   axo.record_execution_result(uuid, text, text, text, text),
   axo.sweep_stuck_attempts(integer),
   axo.expire_stale(),

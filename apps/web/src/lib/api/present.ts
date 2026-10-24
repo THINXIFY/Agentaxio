@@ -73,6 +73,7 @@ const EVENT_LABELS: Record<string, string> = {
   "approval.rejected": "Rejected by a person",
   "approval.expired": "Approval expired",
   "approval.self_approval_blocked": "Self-approval blocked",
+  "approval.policy_author_blocked": "Decision refused: they wrote the rule",
   "approval.digest_mismatch": "Decision refused: details had changed",
   "action_request.queued": "Waiting to run",
   "action_request.cancelled": "Withdrawn",

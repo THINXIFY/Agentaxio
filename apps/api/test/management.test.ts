@@ -621,3 +621,44 @@ describe("concurrency: decisions never race with changes that should win", () =>
     expect(new Set(rows.rows.map((r) => r.epoch)).size).toBeGreaterThan(1);
   });
 });
+
+describe("stopping is always possible; switching back on needs a fresh multi-factor sign-in", () => {
+  it("lets an admin without recent MFA suspend an agent and halt an environment, but not resume either", async () => {
+    const org = await w.freshOrg();
+    const agent = await w.newAgent(org, org.dev);
+    const stale = { mfa: false } as const;
+
+    await w.manage(org.admin, org, (c) => suspendAgent(c, { agentId: agent.agentId }), stale);
+    await w.manage(org.admin, org, (c) => haltEnvironment(c, { environmentId: org.dev }), stale);
+
+    await expect(
+      w.manage(org.admin, org, (c) => resumeAgent(c, { agentId: agent.agentId }), stale),
+    ).rejects.toMatchObject({ code: "STEP_UP" });
+    await expect(
+      w.manage(org.admin, org, (c) => resumeEnvironment(c, { environmentId: org.dev }), stale),
+    ).rejects.toMatchObject({ code: "STEP_UP" });
+
+    const admin = await w.db.admin();
+    expect(
+      (await admin.query("SELECT status FROM axo.agents WHERE id = $1", [agent.agentId])).rows[0]
+        .status,
+    ).toBe("suspended");
+    expect(
+      (await admin.query("SELECT enforcement_state FROM axo.environments WHERE id = $1", [org.dev]))
+        .rows[0].enforcement_state,
+    ).toBe("halted");
+
+    // With a fresh multi-factor sign-in, both work again.
+    await w.manage(org.admin, org, (c) => resumeAgent(c, { agentId: agent.agentId }));
+    await w.manage(org.admin, org, (c) => resumeEnvironment(c, { environmentId: org.dev }));
+  });
+
+  it("still refuses a viewer outright, before any multi-factor question", async () => {
+    const org = await w.freshOrg();
+    const agent = await w.newAgent(org, org.dev);
+    await w.manage(org.admin, org, (c) => suspendAgent(c, { agentId: agent.agentId }));
+    await expect(
+      w.manage(org.viewer, org, (c) => resumeAgent(c, { agentId: agent.agentId })),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+});

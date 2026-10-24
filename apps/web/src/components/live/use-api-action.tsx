@@ -20,6 +20,8 @@ export interface ActionFailure {
 const BY_REASON: Record<string, string> = {
   SELF_APPROVAL:
     "You can’t decide a request from an agent you own, registered or issued a key for. Ask a different approver.",
+  POLICY_AUTHOR:
+    "You wrote a rule that applies to this request, so someone else has to decide it. Ask a different approver.",
   DIGEST_MISMATCH:
     "The details changed since you opened this page, so nothing was recorded. Reload and review it again.",
   ALREADY_DECIDED: "Someone has already decided this request.",

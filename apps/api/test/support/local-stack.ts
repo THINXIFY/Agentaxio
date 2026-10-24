@@ -33,8 +33,17 @@ async function main(): Promise<void> {
   if (process.env.NODE_ENV === "production")
     throw new Error("the local stack never runs in production");
 
-  process.stdout.write("Starting a throw-away PostgreSQL 17 server…\n");
-  const server = await startEmbeddedServer();
+  // CI passes a PostgreSQL service container; otherwise a throw-away server is started from the embedded binaries.
+  const external = process.env.AXO_STACK_ADMIN_URL;
+  process.stdout.write(
+    external === undefined
+      ? "Starting a throw-away PostgreSQL 17 server…\n"
+      : "Using the PostgreSQL server in AXO_STACK_ADMIN_URL…\n",
+  );
+  const server =
+    external === undefined
+      ? await startEmbeddedServer()
+      : { adminUrl: external, stop: () => Promise.resolve() };
   const { env } = await setupLocalDatabase(server.adminUrl, "agentaxio_local_dev");
   const migrator = new pg.Client({ connectionString: env.AXO_MIGRATOR_DATABASE_URL });
   await migrator.connect();

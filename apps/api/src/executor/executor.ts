@@ -51,7 +51,6 @@ interface ClaimRow {
   digest: string;
   ciphertext: Buffer | null;
   key_id: string | null;
-  policy_epoch: string;
 }
 
 type Claim =
@@ -117,11 +116,10 @@ async function claim(deps: ExecutorDeps): Promise<Claim> {
       outcome: string;
       attempt_id: string | null;
       reason_code: string | null;
-    }>("SELECT * FROM axo.claim_finish($1::uuid, $2, $3, $4::bigint, $5::boolean)", [
+    }>("SELECT * FROM axo.claim_finish($1::uuid, $2, $3, $4::boolean)", [
       row.grant_id,
       deps.executorId,
       policyResult,
-      row.policy_epoch,
       parameters !== null,
     ]);
     const result = finished.rows[0];
