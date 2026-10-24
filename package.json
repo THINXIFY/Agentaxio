@@ -2,7 +2,7 @@
   "name": "agentaxio",
   "private": true,
   "version": "0.0.0",
-  "description": "AgentAxio monorepo root. Frontend foundation milestone; backend (apps/api, packages/*) is intentionally not started.",
+  "description": "AgentAxio monorepo root. apps/web is the approved frontend (mock data); apps/api and packages/* are the M01 backend scaffold (local only, no deployment).",
   "packageManager": "pnpm@12.6.0",
   "engines": {
     "node": ">=22"
@@ -11,11 +11,11 @@
     "dev": "pnpm --filter @agentaxio/web dev",
     "build": "pnpm --filter @agentaxio/web build",
     "start": "pnpm --filter @agentaxio/web start",
-    "lint": "pnpm --filter @agentaxio/web lint",
-    "typecheck": "pnpm --filter @agentaxio/web typecheck",
-    "test": "pnpm --filter @agentaxio/web test",
-    "format": "pnpm --filter @agentaxio/web format",
-    "format:check": "pnpm --filter @agentaxio/web format:check",
+    "lint": "pnpm -r --workspace-concurrency=1 --if-present lint",
+    "typecheck": "pnpm -r --workspace-concurrency=1 --if-present typecheck",
+    "test": "pnpm -r --workspace-concurrency=1 --if-present test",
+    "format": "pnpm -r --workspace-concurrency=1 --if-present format",
+    "format:check": "pnpm -r --workspace-concurrency=1 --if-present format:check",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test"
   }
 }

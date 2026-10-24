@@ -1,0 +1,22 @@
+# Local development database only. Nothing here is deployed or used with real data.
+# Copy .env.example to .env and set POSTGRES_PASSWORD before `docker compose up -d`.
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-axo_admin}
+      POSTGRES_DB: ${POSTGRES_DB:-agentaxio_dev}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    ports:
+      # Loopback only: the dev database is never reachable from the network.
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - agentaxio_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-axo_admin} -d $${POSTGRES_DB:-agentaxio_dev}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  agentaxio_pgdata:

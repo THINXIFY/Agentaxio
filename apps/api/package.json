@@ -1,0 +1,28 @@
+{
+  "name": "@agentaxio/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "AgentAxio authorization API: agent-api, management-api and executor roles (M01). Local only; scaffold.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^24.19.2",
+    "eslint": "9.39.5",
+    "globals": "^17.13.0",
+    "prettier": "^3.9.10",
+    "typescript": "5.9.3",
+    "typescript-eslint": "^8.72.0",
+    "vitest": "^5.0.5"
+  }
+}
