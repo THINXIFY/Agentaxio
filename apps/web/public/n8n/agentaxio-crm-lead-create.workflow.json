@@ -1,0 +1,598 @@
+{
+  "name": "AgentAxio: create a lead (asks first, then waits for the answer)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "trigger",
+      "name": "Run manually",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "lead-0",
+              "name": "agentaxio_url",
+              "value": "http://127.0.0.1:8787",
+              "type": "string"
+            },
+            {
+              "id": "lead-1",
+              "name": "full_name",
+              "value": "Ada Example",
+              "type": "string"
+            },
+            {
+              "id": "lead-2",
+              "name": "email",
+              "value": "ada@example.test",
+              "type": "string"
+            },
+            {
+              "id": "lead-3",
+              "name": "company",
+              "value": "Sample Co",
+              "type": "string"
+            },
+            {
+              "id": "lead-4",
+              "name": "idempotency_key",
+              "value": "=agentaxio-lead-{{ $now.toMillis() }}-{{ Math.random().toString(36).slice(2, 10) }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "lead",
+      "name": "Proposed lead",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.agentaxio_url }}/v1/action-requests",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Idempotency-Key",
+              "value": "={{ $json.idempotency_key }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ action: \"crm.lead.create\", resource: \"mockcrm/leads\", parameters: { full_name: $json.full_name, email: $json.email, company: $json.company } }) }}",
+        "options": {
+          "timeout": 10000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "ask",
+      "name": "Ask AgentAxio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "agentaxio-agent-key",
+          "name": "AgentAxio agent key"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "accepted",
+              "leftValue": "={{ $json.statusCode }}",
+              "rightValue": 202,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "accepted",
+      "name": "Accepted?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "blocked",
+              "leftValue": "={{ $json.statusCode }}",
+              "rightValue": 403,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "blocked",
+      "name": "Blocked?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [900, 520]
+    },
+    {
+      "parameters": {
+        "errorMessage": "=AgentAxio did not accept the request (HTTP {{ $json.statusCode }}). Nothing was done."
+      },
+      "id": "refused",
+      "name": "AgentAxio refused or unreachable",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [1120, 640]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "reportBlocked-0",
+              "name": "status",
+              "value": "={{ $json.body.status }}",
+              "type": "string"
+            },
+            {
+              "id": "reportBlocked-1",
+              "name": "reason_code",
+              "value": "={{ $json.body.reason_code }}",
+              "type": "string"
+            },
+            {
+              "id": "reportBlocked-2",
+              "name": "message",
+              "value": "Blocked by AgentAxio. The lead was NOT created.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "reportBlocked",
+      "name": "Report: blocked",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1120, 480]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "remember-0",
+              "name": "request_id",
+              "value": "={{ $json.body.id }}",
+              "type": "string"
+            },
+            {
+              "id": "remember-1",
+              "name": "agentaxio_url",
+              "value": "={{ $('Proposed lead').first().json.agentaxio_url }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "remember",
+      "name": "Remember request",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1120, 200]
+    },
+    {
+      "parameters": {
+        "amount": 5,
+        "unit": "seconds"
+      },
+      "id": "wait",
+      "name": "Wait 5 seconds",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1340, 300],
+      "webhookId": "agentaxio-wait-5s"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Remember request').first().json.agentaxio_url }}/v1/action-requests/{{ $('Remember request').first().json.request_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 10000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "check",
+      "name": "Check status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1560, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "agentaxio-agent-key",
+          "name": "AgentAxio agent key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "readable",
+              "leftValue": "={{ $json.statusCode }}",
+              "rightValue": 200,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "readable",
+      "name": "Status readable?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1780, 300]
+    },
+    {
+      "parameters": {
+        "errorMessage": "=AgentAxio refused the status check (HTTP {{ $json.statusCode }}): the key may be revoked or the agent switched off. Stopping."
+      },
+      "id": "statusRefused",
+      "name": "Status check refused",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [2000, 480]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "finished",
+              "leftValue": "={{ ['denied','succeeded','failed','expired','unknown'].includes($json.body.status) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "finished",
+      "name": "Finished?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [2000, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "enough",
+              "leftValue": "={{ $runIndex >= 179 }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "enough",
+      "name": "Waited long enough?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [2220, 400]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "reportWaiting-0",
+              "name": "status",
+              "value": "={{ $('Check status').last().json.body.status }}",
+              "type": "string"
+            },
+            {
+              "id": "reportWaiting-1",
+              "name": "message",
+              "value": "Gave up polling after 15 minutes. This is NOT a failure: check Approvals and Activity in AgentAxio.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "reportWaiting",
+      "name": "Report: still waiting",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [2440, 480]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "reportFinished-0",
+              "name": "status",
+              "value": "={{ $json.body.status }}",
+              "type": "string"
+            },
+            {
+              "id": "reportFinished-1",
+              "name": "reason_code",
+              "value": "={{ $json.body.reason_code }}",
+              "type": "string"
+            },
+            {
+              "id": "reportFinished-2",
+              "name": "message",
+              "value": "={{ $json.body.status === 'succeeded' ? 'AgentAxio carried out the action: the lead was created in the mock CRM.' : $json.body.status === 'unknown' ? 'AgentAxio cannot confirm whether the lead was created. Do not retry blindly: check the CRM.' : 'The lead was NOT created (' + $json.body.status + ').' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "reportFinished",
+      "name": "Report: finished",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [2220, 200]
+    }
+  ],
+  "connections": {
+    "Run manually": {
+      "main": [
+        [
+          {
+            "node": "Proposed lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Proposed lead": {
+      "main": [
+        [
+          {
+            "node": "Ask AgentAxio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask AgentAxio": {
+      "main": [
+        [
+          {
+            "node": "Accepted?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Accepted?": {
+      "main": [
+        [
+          {
+            "node": "Remember request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Blocked?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Blocked?": {
+      "main": [
+        [
+          {
+            "node": "Report: blocked",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "AgentAxio refused or unreachable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remember request": {
+      "main": [
+        [
+          {
+            "node": "Wait 5 seconds",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 5 seconds": {
+      "main": [
+        [
+          {
+            "node": "Check status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check status": {
+      "main": [
+        [
+          {
+            "node": "Status readable?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Status readable?": {
+      "main": [
+        [
+          {
+            "node": "Finished?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Status check refused",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Finished?": {
+      "main": [
+        [
+          {
+            "node": "Report: finished",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Waited long enough?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Waited long enough?": {
+      "main": [
+        [
+          {
+            "node": "Report: still waiting",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait 5 seconds",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "description": "Asks AgentAxio for permission to create a lead. AgentAxio checks the rules, may ask a person to approve, and its trusted executor creates the lead in the MOCK CRM. This workflow holds only an AgentAxio agent key and never any CRM credential."
+  },
+  "tags": []
+}

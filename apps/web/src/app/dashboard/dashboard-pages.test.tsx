@@ -7,7 +7,7 @@ import { DemoApprovalsPage as ApprovalsPage } from "@/app/dashboard/_demo/approv
 import { DemoActivityPage as ActivityPage } from "@/app/dashboard/_demo/activity";
 import BillingPage from "@/app/dashboard/billing/page";
 import { DemoIdentitiesPage as IdentitiesPage } from "@/app/dashboard/_demo/identities";
-import IntegrationsPage from "@/app/dashboard/integrations/page";
+import { DemoIntegrationsPage as IntegrationsPage } from "@/app/dashboard/_demo/integrations";
 import { DemoOverviewPage as OverviewPage } from "@/app/dashboard/_demo/overview";
 import { DemoPermissionsPage as PermissionsPage } from "@/app/dashboard/_demo/permissions";
 import SettingsPage from "@/app/dashboard/settings/page";
