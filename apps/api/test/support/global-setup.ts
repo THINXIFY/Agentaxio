@@ -41,13 +41,19 @@ export default async function setup(project: TestProject): Promise<() => Promise
   } finally {
     await admin.end();
   }
-  const roles = { migrator: secret(), agentApi: secret(), management: secret() };
+  const roles = {
+    migrator: secret(),
+    agentApi: secret(),
+    management: secret(),
+    executor: secret(),
+  };
   const enable = new pg.Client({ connectionString: adminUrl });
   await enable.connect();
   try {
     await enable.query(`ALTER ROLE axo_migrator LOGIN PASSWORD '${roles.migrator}'`);
     await enable.query(`ALTER ROLE axo_agent_api LOGIN PASSWORD '${roles.agentApi}'`);
     await enable.query(`ALTER ROLE axo_management LOGIN PASSWORD '${roles.management}'`);
+    await enable.query(`ALTER ROLE axo_executor LOGIN PASSWORD '${roles.executor}'`);
   } finally {
     await enable.end();
   }

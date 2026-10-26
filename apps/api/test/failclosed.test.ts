@@ -17,7 +17,7 @@ afterAll(async () => {
 });
 
 const counts = async (agentId: string) => {
-  const admin = await w.db.admin();
+  const admin = await w.db.adminDedicated();
   const r = await admin.query(
     `SELECT (SELECT count(*)::int FROM axo.action_requests WHERE agent_id = $1) AS requests,
             (SELECT count(*)::int FROM axo.decisions d JOIN axo.action_requests r ON r.id = d.action_request_id WHERE r.agent_id = $1) AS decisions,
@@ -31,7 +31,7 @@ describe("S13 failed audit writes", () => {
   it("authorize nothing: a decision whose audit record cannot be written is rolled back entirely", async () => {
     const agent = await w.newAgent(w.orgA, w.orgA.dev);
     await w.policy(w.orgA, { effect: "allow", agentId: agent.agentId });
-    const admin = await w.db.admin();
+    const admin = await w.db.adminDedicated();
     await admin.query(`
       CREATE FUNCTION axo.test_fail_decision_audit() RETURNS trigger LANGUAGE plpgsql AS $$
       BEGIN
@@ -56,7 +56,7 @@ describe("S13 failed audit writes", () => {
 
   it("applies equally to management changes: a policy edit without its audit record does not happen, and the epoch does not move", async () => {
     const org = await w.freshOrg();
-    const admin = await w.db.admin();
+    const admin = await w.db.adminDedicated();
     await admin.query(`
       CREATE FUNCTION axo.test_fail_policy_audit() RETURNS trigger LANGUAGE plpgsql AS $$
       BEGIN
@@ -98,12 +98,16 @@ describe("S13 unavailable dependencies", () => {
     const dead = createPool("postgres://axo_agent_api:x@127.0.0.1:1/none", "dead");
     try {
       await expect(
-        submitActionRequest(dead, w.pepper, {
-          authorization: "Bearer axo_x",
-          idempotencyKey: idem(),
-          body: leadBody(),
-          traceId: "t",
-        }),
+        submitActionRequest(
+          dead,
+          { pepper: w.pepper, dataKeys: w.dataKeys },
+          {
+            authorization: `Bearer axo_${"0".repeat(24)}_${"A".repeat(43)}`,
+            idempotencyKey: idem(),
+            body: leadBody(),
+            traceId: "t",
+          },
+        ),
       ).rejects.toThrow();
     } finally {
       await dead.end();
@@ -113,7 +117,7 @@ describe("S13 unavailable dependencies", () => {
   it("authorize nothing when the connection is cut mid-decision", async () => {
     const agent = await w.newAgent(w.orgA, w.orgA.dev);
     await w.policy(w.orgA, { effect: "allow", agentId: agent.agentId });
-    const admin = await w.db.admin();
+    const admin = await w.db.adminDedicated();
     // Make the decision slow, then terminate its database session while it is waiting.
     await admin.query(`
       CREATE FUNCTION axo.test_slow_decision() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -139,7 +143,7 @@ describe("S13 unavailable dependencies", () => {
     const org = await w.freshOrg();
     const agent = await w.newAgent(org, org.dev);
     await w.policy(org, { effect: "allow", agentId: agent.agentId });
-    const admin = await w.db.admin();
+    const admin = await w.db.adminDedicated();
     await admin.query("BEGIN");
     try {
       // A writer holding the environment for a long time (an in-progress policy change).
@@ -161,7 +165,7 @@ describe("S04 evaluator errors and corrupt policy", () => {
     const agent = await w.newAgent(org, org.dev);
     await w.policy(org, { effect: "allow", agentId: agent.agentId });
     // A policy that bypassed write-time validation (a bug or a direct database edit): it names a field that does not exist.
-    const admin = await w.db.admin();
+    const admin = await w.db.adminDedicated();
     const header = await admin.query(
       "INSERT INTO axo.policies (organization_id, action_key, agent_id, created_by_user_id) VALUES ($1, 'crm.lead.create', $2, $3) RETURNING id",
       [org.id, agent.agentId, org.owner],
@@ -192,7 +196,7 @@ describe("S04 evaluator errors and corrupt policy", () => {
   it("ignore nothing silently: a stored policy that is structurally corrupt is also a denial", async () => {
     const org = await w.freshOrg();
     const agent = await w.newAgent(org, org.dev);
-    const admin = await w.db.admin();
+    const admin = await w.db.adminDedicated();
     const header = await admin.query(
       "INSERT INTO axo.policies (organization_id, action_key, agent_id, created_by_user_id) VALUES ($1, 'crm.lead.create', $2, $3) RETURNING id",
       [org.id, agent.agentId, org.owner],
@@ -222,16 +226,16 @@ describe("bounds on abuse", () => {
       conditions: { all: [{ field: "company", op: "eq", value: "Needs Review" }] },
     });
     await w.policy(org, { effect: "allow", agentId: agent.agentId });
-    const admin = await w.db.admin();
+    const admin = await w.db.adminDedicated();
     await admin.query(
       `INSERT INTO axo.action_requests (organization_id, agent_id, environment_id, action_key, resource, request_key,
-         canonical_digest, canonical_parameters, status, originating_credential_id, expires_at)
-       SELECT $1, $2, $3, 'crm.lead.create', 'mockcrm/leads', 'filler-' || lpad(g::text, 12, '0'), repeat('c', 64), '{}',
+         canonical_digest, parameters_purged_at, status, originating_credential_id, expires_at)
+       SELECT $1, $2, $3, 'crm.lead.create', 'mockcrm/leads', 'filler-' || lpad(g::text, 12, '0'), repeat('c', 64), now(),
               'pending_approval', $4, now() + interval '10 minutes'
          FROM generate_series(1, 100) g`,
       [org.id, agent.agentId, org.dev, agent.credentialId],
     );
-    expect(await w.submit(agent.key, leadBody({ company: "Needs Review" }))).toEqual({
+    expect(await w.submit(agent.key, leadBody({ company: "Needs Review" }))).toMatchObject({
       kind: "rate_limited",
     });
     expect(await w.submit(agent.key, leadBody({ company: "Fine Ltd" }))).toMatchObject({

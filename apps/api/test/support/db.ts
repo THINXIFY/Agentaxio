@@ -9,13 +9,16 @@ import { createPool } from "../../src/db/pool";
 export interface TestDatabase {
   name: string;
   /** Connection strings per role, each pointing at this test's own database. */
-  urls: { admin: string; migrator: string; agentApi: string; management: string };
-  /** A superuser connection for fixtures and for tampering the tests need; never used by the code under test. */
+  urls: { admin: string; migrator: string; agentApi: string; management: string; executor: string };
+  /** ONE shared superuser connection for fixtures and for tampering the tests need; never used by the code under test. Do not end it or open a transaction on it. */
   admin(): Promise<pg.Client>;
+  /** A brand-new superuser connection the caller owns (for BEGIN/COMMIT work or to end it). */
+  adminDedicated(): Promise<pg.Client>;
   /** Owner-role pool for provisioning. */
   migratorPool(): pg.Pool;
   agentPool(): pg.Pool;
   managementPool(): pg.Pool;
+  executorPool(): pg.Pool;
   drop(): Promise<void>;
 }
 
@@ -47,6 +50,7 @@ export async function createTestDatabase(
     migrator: withDatabase(cluster.adminUrl, name, "axo_migrator", cluster.roles.migrator),
     agentApi: withDatabase(cluster.adminUrl, name, "axo_agent_api", cluster.roles.agentApi),
     management: withDatabase(cluster.adminUrl, name, "axo_management", cluster.roles.management),
+    executor: withDatabase(cluster.adminUrl, name, "axo_executor", cluster.roles.executor),
   };
 
   const setup = new pg.Client({ connectionString: cluster.adminUrl });
@@ -79,24 +83,29 @@ export async function createTestDatabase(
 
   const pools: pg.Pool[] = [];
   const clients: pg.Client[] = [];
+  let shared: Promise<pg.Client> | undefined;
   const makePool = (url: string, app: string) => {
     const pool = createPool(url, app);
     pools.push(pool);
     return pool;
   };
 
+  const dedicatedAdmin = async () => {
+    const client = new pg.Client({ connectionString: adminUrl });
+    await client.connect();
+    clients.push(client);
+    return client;
+  };
+
   return {
     name,
     urls,
-    async admin() {
-      const client = new pg.Client({ connectionString: adminUrl });
-      await client.connect();
-      clients.push(client);
-      return client;
-    },
+    admin: () => (shared ??= dedicatedAdmin()),
+    adminDedicated: dedicatedAdmin,
     migratorPool: () => makePool(urls.migrator, "test-migrator"),
     agentPool: () => makePool(urls.agentApi, "test-agent-api"),
     managementPool: () => makePool(urls.management, "test-management"),
+    executorPool: () => makePool(urls.executor, "test-executor"),
     async drop() {
       for (const pool of pools) await pool.end().catch(() => undefined);
       for (const client of clients) await client.end().catch(() => undefined);

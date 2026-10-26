@@ -4,6 +4,7 @@ import {
   provisionEnvironment,
   provisionMembership,
   provisionOrganization,
+  provisionSession,
   provisionUser,
 } from "../../src/db/provision";
 import {
@@ -11,10 +12,10 @@ import {
   registerAgent,
   withManagement,
   createPolicy,
-  type ManagementActor,
   type PolicyBody,
 } from "../../src/management";
 import { submitActionRequest, type SubmitOutcome } from "../../src/authorization/submit";
+import { parseKeyRing, type KeyRing } from "../../src/crypto/data-keys";
 import { createTestDatabase, type TestDatabase } from "./db";
 
 /** Only invented organizations, people and addresses (.test is a reserved TLD). */
@@ -32,6 +33,7 @@ export interface TestOrg {
 export interface World {
   db: TestDatabase;
   pepper: Buffer;
+  dataKeys: KeyRing;
   agentPool: pg.Pool;
   managementPool: pg.Pool;
   migratorPool: pg.Pool;
@@ -39,9 +41,18 @@ export interface World {
   orgB: TestOrg;
   /** A real user with no membership anywhere. */
   outsider: string;
-  actor(user: string, org: TestOrg): ManagementActor;
-  /** Run management work as `user` in `org`. */
-  manage<T>(user: string, org: TestOrg, work: Parameters<typeof withManagement<T>>[2]): Promise<T>;
+  /** A live session for `user` (opened directly, as the identity provider would have). Cached per user and MFA state. */
+  session(
+    user: string,
+    options?: { mfa?: boolean },
+  ): Promise<{ sessionToken: string; csrfToken: string }>;
+  /** Run management work as `user` in `org`, signed in with a fresh multi-factor session unless told otherwise. */
+  manage<T>(
+    user: string,
+    org: TestOrg,
+    work: Parameters<typeof withManagement<T>>[2],
+    options?: { mfa?: boolean },
+  ): Promise<T>;
   /** Register an agent in `env` (owned by the org's approver-free owner) and issue it one credential. */
   newAgent(
     org: TestOrg,
@@ -106,6 +117,10 @@ async function makeOrg(migrator: pg.Pool, slug: string): Promise<TestOrg> {
 export async function createWorld(): Promise<World> {
   const db = await createTestDatabase();
   const pepper = randomBytes(32);
+  const dataKeys = parseKeyRing(
+    JSON.stringify({ k1: randomBytes(32).toString("base64url") }),
+    "k1",
+  );
   const agentPool = db.agentPool();
   const managementPool = db.managementPool();
   const migratorPool = db.migratorPool();
@@ -117,23 +132,32 @@ export async function createWorld(): Promise<World> {
     subject: `outsider-${suffix}`,
   });
 
-  const actor = (user: string, org: TestOrg): ManagementActor => ({
-    userId: user,
-    organizationId: org.id,
-  });
-  const manage: World["manage"] = (user, org, work) =>
-    withManagement(managementPool, actor(user, org), work);
+  const sessions = new Map<string, Promise<{ sessionToken: string; csrfToken: string }>>();
+  const session: World["session"] = (user, options = {}) => {
+    const key = `${user}|${options.mfa === false ? "plain" : "mfa"}`;
+    let existing = sessions.get(key);
+    if (existing === undefined) {
+      existing = provisionSession(migratorPool, { userId: user, mfa: options.mfa ?? true });
+      sessions.set(key, existing);
+    }
+    return existing;
+  };
+  const manage: World["manage"] = async (user, org, work, options) => {
+    const { sessionToken } = await session(user, options);
+    return withManagement(managementPool, { sessionToken, organizationId: org.id }, work);
+  };
 
   return {
     db,
     pepper,
+    dataKeys,
     agentPool,
     managementPool,
     migratorPool,
     orgA,
     orgB,
     outsider,
-    actor,
+    session,
     manage,
     async newAgent(org, env, name = `agent-${randomBytes(3).toString("hex")}`) {
       return manage(org.admin, org, async (context) => {
@@ -157,12 +181,16 @@ export async function createWorld(): Promise<World> {
       );
     },
     submit(key, body = leadBody(), idempotencyKey = idem()) {
-      return submitActionRequest(agentPool, pepper, {
-        authorization: `Bearer ${key}`,
-        idempotencyKey,
-        body,
-        traceId: randomUUID(),
-      });
+      return submitActionRequest(
+        agentPool,
+        { pepper, dataKeys },
+        {
+          authorization: `Bearer ${key}`,
+          idempotencyKey,
+          body,
+          traceId: randomUUID(),
+        },
+      );
     },
     freshOrg: () => makeOrg(migratorPool, `fresh-${randomBytes(4).toString("hex")}`),
     async close() {

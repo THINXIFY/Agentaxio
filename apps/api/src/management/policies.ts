@@ -1,7 +1,7 @@
 import { validatePolicyForAction, POLICY_EFFECTS, type PolicyEffect } from "@agentaxio/contracts";
 import { recordAudit } from "../audit";
 import { invalid, notFound } from "../errors";
-import { assertUuid, requireAdmin, type ManagementContext } from "./context";
+import { assertUuid, requireAdmin, requireStepUp, type ManagementContext } from "./context";
 
 /**
  * Policy management. A policy header fixes what it governs and never changes; its behaviour is a sequence of
@@ -72,6 +72,7 @@ export async function createPolicy(
   input: PolicyBody & { actionKey: string; environmentId?: string; agentId?: string },
 ): Promise<{ policyId: string; versionId: string; version: 1 }> {
   requireAdmin(context);
+  requireStepUp(context);
   if (input.environmentId !== undefined) assertUuid(input.environmentId, "environment id");
   if (input.agentId !== undefined) assertUuid(input.agentId, "agent id");
   checkBody(input.actionKey, input);
@@ -110,6 +111,7 @@ export async function createPolicyVersion(
   input: PolicyBody & { policyId: string; expectedVersion: number },
 ): Promise<{ versionId: string; version: number }> {
   requireAdmin(context);
+  requireStepUp(context);
   assertUuid(input.policyId, "policy id");
   if (!Number.isInteger(input.expectedVersion) || input.expectedVersion < 1) {
     throw invalid("expectedVersion must be a positive integer");

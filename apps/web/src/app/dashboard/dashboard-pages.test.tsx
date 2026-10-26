@@ -1,17 +1,17 @@
 import { render, screen, within } from "@testing-library/react";
 import * as React from "react";
 import { describe, expect, it, vi } from "vitest";
-import AgentDetailPage, { generateStaticParams } from "@/app/dashboard/agents/[id]/page";
-import AgentsPage from "@/app/dashboard/agents/page";
-import ApprovalsPage from "@/app/dashboard/approvals/page";
-import ActivityPage from "@/app/dashboard/audit/page";
+import { DemoAgentDetail } from "@/app/dashboard/_demo/agent-detail";
+import { DemoAgentsPage as AgentsPage } from "@/app/dashboard/_demo/agents";
+import { DemoApprovalsPage as ApprovalsPage } from "@/app/dashboard/_demo/approvals";
+import { DemoActivityPage as ActivityPage } from "@/app/dashboard/_demo/activity";
 import BillingPage from "@/app/dashboard/billing/page";
-import IdentitiesPage from "@/app/dashboard/identities/page";
+import { DemoIdentitiesPage as IdentitiesPage } from "@/app/dashboard/_demo/identities";
 import IntegrationsPage from "@/app/dashboard/integrations/page";
-import OverviewPage from "@/app/dashboard/page";
-import PermissionsPage from "@/app/dashboard/policies/page";
+import { DemoOverviewPage as OverviewPage } from "@/app/dashboard/_demo/overview";
+import { DemoPermissionsPage as PermissionsPage } from "@/app/dashboard/_demo/permissions";
 import SettingsPage from "@/app/dashboard/settings/page";
-import TeamPage from "@/app/dashboard/team/page";
+import { DemoTeamPage as TeamPage } from "@/app/dashboard/_demo/team";
 import DashboardTemplate from "@/app/dashboard/template";
 import { ToastProvider } from "@/components/ui/toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -37,7 +37,7 @@ const KNOWN_ROUTES = new Set([
 ]);
 
 async function agentDetail(id: string) {
-  return AgentDetailPage({ params: Promise.resolve({ id }) });
+  return DemoAgentDetail({ id });
 }
 
 const PAGES: ReadonlyArray<
@@ -168,7 +168,7 @@ describe("My Agents and agent details", () => {
   });
 
   it("every sample agent has a details page, and unknown agents are a 404", async () => {
-    expect(generateStaticParams().map((p) => p.id)).toEqual(AGENT_IDS);
+    for (const id of AGENT_IDS) expect(DemoAgentDetail({ id })).toBeTruthy();
     await expect(agentDetail("not-an-agent")).rejects.toThrow("NEXT_NOT_FOUND");
   });
 });

@@ -71,6 +71,73 @@ jobs:
       - name: Production build
         run: pnpm build
 
+  live-e2e:
+    name: Live dashboard end to end
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # The live-mode website, the agent and management APIs, the trusted executor and the mock CRM, against a real
+    # PostgreSQL 17 and the real OpenID Connect flow (a protocol test double stands in for the identity provider, which
+    # is NOT proof of interoperability with a real one). The script signs in as three invented people and checks, over
+    # HTTP, the golden path and the security refusals: self-approval, wrong fingerprint, viewer, CSRF, Origin.
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: ci-throwaway-not-a-secret
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      AXO_STACK_ADMIN_URL: postgres://postgres:ci-throwaway-not-a-secret@localhost:5432/postgres
+      AXO_API_URL: http://127.0.0.1:8788
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Production build of the website in live mode
+        run: pnpm --filter @agentaxio/web build
+
+      - name: Start the backend stack
+        run: |
+          pnpm --filter @agentaxio/api dev:stack > stack.log 2>&1 &
+          for i in $(seq 1 60); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8788/v1/me || true)
+            [ "$code" = "401" ] && exit 0
+            sleep 2
+          done
+          echo "backend stack did not start"; cat stack.log; exit 1
+
+      - name: Start the website
+        run: |
+          pnpm --filter @agentaxio/web start > web.log 2>&1 &
+          for i in $(seq 1 60); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/dashboard || true)
+            [ "$code" = "200" ] && exit 0
+            sleep 2
+          done
+          echo "website did not start"; cat web.log; exit 1
+
+      - name: Golden path and security refusals over HTTP
+        run: node apps/api/test/support/live-flow.mjs
+
+      - name: Logs on failure
+        if: failure()
+        run: |
+          echo "--- stack.log"; cat stack.log || true
+          echo "--- web.log"; cat web.log || true
+
   repo-hygiene:
     name: Secrets and environment files
     runs-on: ubuntu-latest

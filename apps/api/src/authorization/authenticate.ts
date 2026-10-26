@@ -1,3 +1,4 @@
+import type pg from "pg";
 import type { Tx } from "../db/pool";
 import {
   bearerFromHeader,
@@ -91,4 +92,35 @@ export async function authenticateAgent(
       pendingRequests: ctx.pending_requests,
     },
   };
+}
+
+/**
+ * Verify the key's secret with a single short query, holding no locks and no transaction, and say which agent it
+ * belongs to. The agent API uses this to apply a per-agent rate limit BEFORE it opens the locking transaction: a
+ * request must never hold one pooled connection while waiting for another. The authoritative check (revoked, expired,
+ * suspended, halted) is still made inside the transaction, under locks, by authenticateAgent.
+ */
+export async function verifyAgentSecret(
+  pool: pg.Pool,
+  pepper: Buffer,
+  authorizationHeader: string | undefined,
+): Promise<{ kind: "ok"; agentId: string } | { kind: "unauthenticated" }> {
+  const presented = bearerFromHeader(authorizationHeader);
+  const parsed = presented === null ? null : parseCredential(presented);
+  if (parsed === null) {
+    burnVerification(pepper, presented ?? "");
+    return { kind: "unauthenticated" };
+  }
+  const found = await pool.query<{ agent_id: string; secret_hash: Buffer }>(
+    "SELECT agent_id, secret_hash FROM axo.lookup_credential($1)",
+    [parsed.keyId],
+  );
+  const row = found.rows[0];
+  if (row === undefined) {
+    burnVerification(pepper, parsed.secret);
+    return { kind: "unauthenticated" };
+  }
+  return verifySecret(pepper, parsed.secret, row.secret_hash)
+    ? { kind: "ok", agentId: row.agent_id }
+    : { kind: "unauthenticated" };
 }

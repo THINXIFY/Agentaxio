@@ -5,6 +5,7 @@ import {
   provisionEnvironment,
   provisionMembership,
   provisionOrganization,
+  provisionSession,
   provisionUser,
 } from "../db/provision";
 import { createPolicy, issueCredential, registerAgent, withManagement } from "../management";
@@ -41,6 +42,7 @@ export async function seedDemo(
   let organizationId: string;
   let userIds: Record<string, string>;
   let devEnvironment: string;
+  let adminSession: string;
   try {
     const database =
       (await owner.query<{ db: string }>("SELECT current_database() AS db")).rows[0]?.db ?? "";
@@ -70,6 +72,9 @@ export async function seedDemo(
       await provisionMembership(owner, { organizationId, userId, role });
       userIds[role] = userId;
     }
+    // A short-lived local session for the demo administrator, opened directly by the schema owner (there is no identity
+    // provider in this script). It exists only so the management operations below run exactly as a signed-in person's would.
+    adminSession = (await provisionSession(owner, { userId: userIds.admin ?? "" })).sessionToken;
     await owner.query("COMMIT");
   } catch (error) {
     await owner.query("ROLLBACK").catch(() => undefined);
@@ -81,22 +86,26 @@ export async function seedDemo(
   const adminId = userIds.admin ?? "";
   const pool = createPool(managementUrl, "seed");
   try {
-    const key = await withManagement(pool, { userId: adminId, organizationId }, async (context) => {
-      const { agentId } = await registerAgent(context, {
-        environmentId: devEnvironment,
-        ownerUserId: userIds.owner ?? "",
-        name: "Lead Intake Agent (mock)",
-        description:
-          "Invented agent for local demonstrations. It does not exist outside this database.",
-      });
-      await createPolicy(context, {
-        actionKey: "crm.lead.create",
-        agentId,
-        effect: "require_approval",
-        conditions: { all: [] },
-      });
-      return (await issueCredential(context, pepper, { agentId })).fullKey;
-    });
+    const key = await withManagement(
+      pool,
+      { sessionToken: adminSession, organizationId },
+      async (context) => {
+        const { agentId } = await registerAgent(context, {
+          environmentId: devEnvironment,
+          ownerUserId: userIds.owner ?? "",
+          name: "Lead Intake Agent (mock)",
+          description:
+            "Invented agent for local demonstrations. It does not exist outside this database.",
+        });
+        await createPolicy(context, {
+          actionKey: "crm.lead.create",
+          agentId,
+          effect: "require_approval",
+          conditions: { all: [] },
+        });
+        return (await issueCredential(context, pepper, { agentId })).fullKey;
+      },
+    );
     return { alreadySeeded: false, organizationId, agentKey: key, adminUserId: adminId };
   } finally {
     await pool.end();
