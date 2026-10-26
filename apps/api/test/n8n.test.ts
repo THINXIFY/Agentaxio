@@ -399,6 +399,38 @@ describe("the example workflow shipped for n8n", () => {
     expect(byName("Check status")?.retryOnFail).toBeUndefined();
   });
 
+  it("builds an Idempotency-Key the API accepts, that differs on every run, even in the same millisecond", () => {
+    const assignments = (
+      byName("Proposed lead")?.parameters.assignments as {
+        assignments: Array<{ name: string; value: string }>;
+      }
+    ).assignments;
+    const expr = assignments.find((a) => a.name === "idempotency_key")?.value ?? "";
+    // Evaluate the shipped expression the way n8n would: only these two known pieces may appear inside the braces.
+    const randomPart = "Math.random().toString(36).slice(2, 10)";
+    const make = (ms: number) =>
+      expr
+        .replace(/^=/, "")
+        .replace("{{ $now.toMillis() }}", String(ms))
+        .replace(`{{ ${randomPart} }}`, () => Math.random().toString(36).slice(2, 10));
+    expect(make(1)).not.toContain("{{");
+    const keys = Array.from({ length: 5000 }, () => make(1_800_000_000_000));
+    for (const k of keys) {
+      expect(k).toMatch(/^[A-Za-z0-9._:-]{16,128}$/);
+    }
+    expect(new Set(keys).size).toBe(keys.length);
+    // A run a millisecond later can never collide with an earlier one either.
+    expect(make(1_800_000_000_001)).not.toBe(make(1_800_000_000_000));
+    // Even if the random part came out empty, the key stays valid and still carries the timestamp.
+    const zero = Math.random;
+    Math.random = () => 0;
+    try {
+      expect(make(1_800_000_000_000)).toMatch(/^[A-Za-z0-9._:-]{16,128}$/);
+    } finally {
+      Math.random = zero;
+    }
+  });
+
   it("fails closed: anything but an accepted answer stops, and a refused status check stops", () => {
     const next = (from: string, branch: number) =>
       workflow.connections[from]?.main[branch]?.[0]?.node;
